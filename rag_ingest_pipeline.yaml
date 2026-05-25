@@ -208,6 +208,10 @@ components:
           description: Number of Ray worker pods.
           isOptional: true
           parameterType: NUMBER_INTEGER
+        pipeline_run_id:
+          defaultValue: ''
+          isOptional: true
+          parameterType: STRING
         pvc_mount_path:
           description: Mount path for the PVC inside pods.
           parameterType: STRING
@@ -278,10 +282,10 @@ deploymentSpec:
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
           \ python3 -m pip install --quiet --no-warn-script-location 'pymilvus>=2.4.0'\
           \ 'sentence-transformers>=2.2.0' 'requests>=2.28.0' 'boto3>=1.28.0' 'rhoai-lineage\
-          \ @ git+https://github.com/briangallagher/rhoai-lineage.git' 'mlflow>=2.0.0'\
-          \  &&  python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
-          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
-          $0\" \"$@\"\n"
+          \ @ git+https://github.com/briangallagher/rhoai-lineage.git'  &&  python3\
+          \ -m pip install --quiet --no-warn-script-location 'kfp==2.16.1' '--no-deps'\
+          \ 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"$0\" \"$@\"\
+          \n"
         - sh
         - -ec
         - 'program_path=$(mktemp -d)
@@ -446,38 +450,70 @@ deploymentSpec:
           \        ):\n            pass\n        print(\"OpenLineage COMPLETE event\
           \ emitted for ingest_to_milvus\")\n    except Exception as e:\n        print(f\"\
           WARNING: OpenLineage emission failed (non-fatal): {e}\")\n\n    # --- MLflow\
-          \ tracking (best-effort) ---\n    try:\n        import mlflow\n        import\
-          \ mlflow.utils.rest_utils as _mlflow_rest\n\n        sa_token_path = \"\
-          /var/run/secrets/kubernetes.io/serviceaccount/token\"\n        sa_ns_path\
-          \ = \"/var/run/secrets/kubernetes.io/serviceaccount/namespace\"\n      \
-          \  _mlflow_workspace = \"\"\n        if os.path.exists(sa_token_path):\n\
-          \            with open(sa_token_path) as f:\n                os.environ[\"\
-          MLFLOW_TRACKING_TOKEN\"] = f.read().strip()\n            if os.path.exists(sa_ns_path):\n\
-          \                with open(sa_ns_path) as f:\n                    _mlflow_workspace\
-          \ = f.read().strip()\n        os.environ[\"MLFLOW_TRACKING_INSECURE_TLS\"\
-          ] = \"true\"\n\n        if _mlflow_workspace:\n            _orig_http_request\
-          \ = _mlflow_rest.http_request\n            def _workspace_http_request(*args,\
-          \ **kwargs):\n                eh = kwargs.get(\"extra_headers\") or {}\n\
-          \                eh[\"X-Mlflow-Workspace\"] = _mlflow_workspace\n      \
-          \          kwargs[\"extra_headers\"] = eh\n                return _orig_http_request(*args,\
-          \ **kwargs)\n            _mlflow_rest.http_request = _workspace_http_request\n\
-          \n        mlflow_uri = os.environ.get(\n            \"MLFLOW_TRACKING_URI\"\
-          ,\n            \"https://mlflow.redhat-ods-applications.svc:8443\",\n  \
-          \      )\n        mlflow.set_tracking_uri(mlflow_uri)\n        mlflow.set_experiment(\n\
-          \            os.environ.get(\"OPENLINEAGE_NAMESPACE\", \"data-strat-poc\"\
-          )\n        )\n\n        with mlflow.start_run(run_name=\"ingest_to_milvus\"\
-          ):\n            mlflow.log_params({\n                \"collection_name\"\
-          : collection_name,\n                \"embedding_model\": embedding_model,\n\
-          \                \"embedding_dim\": str(embedding_dim),\n              \
-          \  \"milvus_host\": milvus_host,\n                \"index_type\": index_type,\n\
-          \                \"pipeline_run_id\": pipeline_run_id or \"unknown\",\n\
-          \                \"drop_existing\": str(drop_existing),\n            })\n\
-          \            mlflow.log_metrics({\n                \"vectors_inserted\"\
-          : float(total_inserted),\n                \"duration_seconds\": round(wall_clock,\
-          \ 2),\n                \"source_files\": float(file_count),\n          \
-          \  })\n        print(\"MLflow run logged for ingest_to_milvus\")\n    except\
-          \ Exception as e:\n        print(f\"WARNING: MLflow tracking failed (non-fatal):\
-          \ {e}\")\n\n    return f\"{collection_name}:{total_inserted}\"\n\n"
+          \ tracking via REST API (best-effort) ---\n    # Direct REST calls with\
+          \ SA token auth \u2014 the RHOAI MLflow Operator\n    # requires Authorization\
+          \ + X-Mlflow-Workspace headers that the vanilla\n    # mlflow client doesn't\
+          \ inject from KFP pods.\n    try:\n        class _MLflowRESTTracker:\n \
+          \           def __init__(self):\n                self._url = \"https://mlflow.redhat-ods-applications.svc:8443\"\
+          \n                self._headers = {\"Content-Type\": \"application/json\"\
+          }\n                self._run_id = None\n                self._experiment_id\
+          \ = None\n                _sa_token = \"/var/run/secrets/kubernetes.io/serviceaccount/token\"\
+          \n                _sa_ns = \"/var/run/secrets/kubernetes.io/serviceaccount/namespace\"\
+          \n                if os.path.exists(_sa_token):\n                    with\
+          \ open(_sa_token) as f:\n                        self._headers[\"Authorization\"\
+          ] = f\"Bearer {f.read().strip()}\"\n                if os.path.exists(_sa_ns):\n\
+          \                    with open(_sa_ns) as f:\n                        self._headers[\"\
+          X-Mlflow-Workspace\"] = f.read().strip()\n\n            def _post(self,\
+          \ endpoint, data):\n                resp = req_lib.post(f\"{self._url}{endpoint}\"\
+          , json=data,\n                                    headers=self._headers,\
+          \ verify=False, timeout=10)\n                resp.raise_for_status()\n \
+          \               return resp.json()\n\n            def create_experiment(self,\
+          \ name):\n                try:\n                    result = self._post(\"\
+          /api/2.0/mlflow/experiments/create\", {\"name\": name})\n              \
+          \      self._experiment_id = result.get(\"experiment_id\")\n           \
+          \     except Exception:\n                    resp = req_lib.get(f\"{self._url}/api/2.0/mlflow/experiments/get-by-name\"\
+          ,\n                                       params={\"experiment_name\": name},\n\
+          \                                       headers=self._headers, verify=False,\
+          \ timeout=10)\n                    if resp.ok:\n                       \
+          \ self._experiment_id = resp.json().get(\"experiment\", {}).get(\"experiment_id\"\
+          )\n                return self._experiment_id\n\n            def start_run(self,\
+          \ run_name=\"\"):\n                if not self._experiment_id:\n       \
+          \             return None\n                result = self._post(\"/api/2.0/mlflow/runs/create\"\
+          , {\n                    \"experiment_id\": self._experiment_id, \"run_name\"\
+          : run_name,\n                })\n                self._run_id = result.get(\"\
+          run\", {}).get(\"info\", {}).get(\"run_id\")\n                return self._run_id\n\
+          \n            def log_param(self, key, value):\n                if not self._run_id:\n\
+          \                    return\n                self._post(\"/api/2.0/mlflow/runs/log-parameter\"\
+          , {\n                    \"run_id\": self._run_id, \"key\": key, \"value\"\
+          : str(value),\n                })\n\n            def log_metric(self, key,\
+          \ value):\n                if not self._run_id:\n                    return\n\
+          \                self._post(\"/api/2.0/mlflow/runs/log-metric\", {\n   \
+          \                 \"run_id\": self._run_id, \"key\": key, \"value\": float(value),\n\
+          \                    \"timestamp\": int(time.time() * 1000),\n         \
+          \       })\n\n            def end_run(self, status=\"FINISHED\"):\n    \
+          \            if not self._run_id:\n                    return\n        \
+          \        self._post(\"/api/2.0/mlflow/runs/update\", {\n               \
+          \     \"run_id\": self._run_id, \"status\": status,\n                  \
+          \  \"end_time\": int(time.time() * 1000),\n                })\n\n      \
+          \  tracker = _MLflowRESTTracker()\n        tracker.create_experiment(\"\
+          data-strat-ingest\")\n        tracker.start_run(run_name=f\"ingest-{collection_name}\"\
+          )\n        tracker.log_param(\"pipeline_run_id\", pipeline_run_id)\n   \
+          \     tracker.log_param(\"collection_name\", collection_name)\n        tracker.log_param(\"\
+          embedding_model\", embedding_model)\n        tracker.log_param(\"embedding_dim\"\
+          , str(embedding_dim))\n        tracker.log_param(\"index_type\", index_type)\n\
+          \        tracker.log_param(\"milvus_host\", milvus_host)\n        tracker.log_param(\"\
+          s3_bucket\", s3_bucket)\n        tracker.log_param(\"s3_prefix\", s3_prefix)\n\
+          \        tracker.log_param(\"embed_batch_size\", str(embed_batch_size))\n\
+          \        tracker.log_param(\"milvus_batch_size\", str(milvus_batch_size))\n\
+          \        tracker.log_param(\"drop_existing\", str(drop_existing))\n    \
+          \    tracker.log_metric(\"vectors_inserted\", float(total_inserted))\n \
+          \       tracker.log_metric(\"documents_processed\", float(file_count))\n\
+          \        tracker.log_metric(\"duration_seconds\", wall_clock)\n        tracker.log_metric(\"\
+          vectors_per_second\", float(total_inserted / max(wall_clock, 0.1)))\n  \
+          \      tracker.end_run()\n        print(\"MLflow: logged ingest run to experiment\
+          \ 'data-strat-ingest'\")\n    except Exception as e:\n        print(f\"\
+          MLflow tracking failed (non-blocking): {e}\")\n\n    return f\"{collection_name}:{total_inserted}\"\
+          \n\n"
         image: registry.redhat.io/rhoai/odh-pipeline-runtime-datascience-cpu-py312-rhel9@sha256:f9844dc150592a9f196283b3645dda92bd80dfdb3d467fa8725b10267ea5bdbc
     exec-parse-and-chunk:
       container:
@@ -493,7 +529,7 @@ deploymentSpec:
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
           \ python3 -m pip install --quiet --no-warn-script-location 'codeflare-sdk==0.35.0'\
           \ 'kubernetes>=28.1.0' 'rhoai-lineage @ git+https://github.com/briangallagher/rhoai-lineage.git'\
-          \ 'mlflow>=2.0.0'  &&  python3 -m pip install --quiet --no-warn-script-location\
+          \ 'requests>=2.28.0'  &&  python3 -m pip install --quiet --no-warn-script-location\
           \ 'kfp==2.16.1' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"\
           3.9\"' && \"$0\" \"$@\"\n"
         - sh
@@ -518,59 +554,59 @@ deploymentSpec:
           \ int = 0,\n    timeout_seconds: int = 600,\n    enable_profiling: bool\
           \ = False,\n    verbose: bool = True,\n    bypass_kueue: bool = False,\n\
           \    doc_category: str = \"\",\n    doc_subcategory: str = \"\",\n    doc_date:\
-          \ str = \"\",\n) -> str:\n    \"\"\"Parse PDFs and write chunked JSONL files\
-          \ to S3.\n\n    Args:\n        pvc_name: Name of the PVC with input PDFs.\n\
-          \        pvc_mount_path: Mount path for the PVC inside pods.\n        input_path:\
-          \ Relative path to input PDFs under the PVC.\n        ray_image: Container\
-          \ image with Ray + Docling pre-installed.\n        namespace: OpenShift\
-          \ namespace for the RayJob.\n        s3_endpoint: S3-compatible endpoint\
-          \ URL (e.g. MinIO).\n        s3_bucket: S3 bucket for output chunks.\n \
-          \       s3_prefix: Key prefix for chunk files in S3.\n        s3_secret_name:\
-          \ Kubernetes Secret with S3 credentials (keys: access_key, secret_key).\n\
-          \        tokenizer: Tokenizer for HybridChunker (usually the embedding model\
-          \ name).\n        chunk_max_tokens: Max tokens per chunk (HybridChunker).\n\
-          \        num_workers: Number of Ray worker pods.\n        worker_cpus: CPUs\
-          \ per worker pod.\n        worker_memory_gb: Memory (GB) per worker pod.\n\
-          \        head_cpus: CPUs for the Ray head pod.\n        head_memory_gb:\
-          \ Memory (GB) for the Ray head pod.\n        cpus_per_actor: CPUs per Docling\
-          \ processing actor.\n        min_actors: Minimum actor pool size.\n    \
-          \    max_actors: Maximum actor pool size.\n        batch_size: Files per\
-          \ batch sent to each actor.\n        num_files: Number of PDFs to process\
-          \ (0 = all).\n        timeout_seconds: Per-file processing timeout.\n  \
-          \      enable_profiling: Enable cProfile profiling (outputs profile stats).\n\
-          \        verbose: Enable verbose logging for debugging.\n        bypass_kueue:\
-          \ If True, remove the Kueue queue-name label and manually\n            unsuspend\
-          \ the RayJob, bypassing cluster quota management. Only use\n           \
-          \ on clusters without Kueue or with sufficient free resources.\n\n    Returns:\n\
-          \        The S3 URI where JSONL chunk files were written.\n    \"\"\"\n\
-          \    import base64\n    import textwrap\n    import time\n\n    # Entrypoint\
-          \ script that runs on the Ray cluster.\n    # It parses PDFs with Docling,\
-          \ chunks with HybridChunker,\n    # and writes JSONL files to S3.\n    _DOCLING_CHUNK_PROCESS_PY\
-          \ = textwrap.dedent('''\\\n        \"\"\"Ray Data + Docling: parse PDFs\
-          \ and chunk with HybridChunker.\"\"\"\n\n        import glob\n        import\
-          \ io\n        import json\n        import multiprocessing as mp\n      \
-          \  import os\n        import queue\n        import time\n        from typing\
-          \ import Dict, List\n\n        import pandas as pd\n        import ray\n\
-          \n        MIN_ACTORS = int(os.environ.get(\"MIN_ACTORS\", \"2\"))\n    \
-          \    MAX_ACTORS = int(os.environ.get(\"MAX_ACTORS\", \"4\"))\n        CPUS_PER_ACTOR\
-          \ = int(os.environ.get(\"CPUS_PER_ACTOR\", \"4\"))\n        BATCH_SIZE =\
-          \ int(os.environ.get(\"BATCH_SIZE\", \"4\"))\n        REPARTITION_FACTOR\
-          \ = int(os.environ.get(\"REPARTITION_FACTOR\", \"10\"))\n\n        PVC_MOUNT_PATH\
-          \ = os.environ.get(\"PVC_MOUNT_PATH\", \"/mnt/data\")\n        INPUT_PATH\
-          \ = os.environ.get(\"INPUT_PATH\", \"input/pdfs\")\n        NUM_FILES =\
-          \ int(os.environ.get(\"NUM_FILES\", \"0\"))\n\n        FILE_TIMEOUT = int(os.environ.get(\"\
-          FILE_TIMEOUT\", \"600\"))\n        MAX_ERRORED_BLOCKS = int(os.environ.get(\"\
-          MAX_ERRORED_BLOCKS\", \"50\"))\n\n        CHUNK_MAX_TOKENS = int(os.environ.get(\"\
-          CHUNK_MAX_TOKENS\", \"256\"))\n        TOKENIZER = os.environ.get(\"TOKENIZER\"\
-          , \"sentence-transformers/all-MiniLM-L6-v2\")\n\n        S3_ENDPOINT = os.environ.get(\"\
-          S3_ENDPOINT\", \"\")\n        S3_BUCKET = os.environ.get(\"S3_BUCKET\",\
-          \ \"rag-chunks\")\n        S3_PREFIX = os.environ.get(\"S3_PREFIX\", \"\
-          chunks\")\n        S3_ACCESS_KEY = os.environ.get(\"S3_ACCESS_KEY\", \"\"\
-          )\n        S3_SECRET_KEY = os.environ.get(\"S3_SECRET_KEY\", \"\")\n\n \
-          \       ENABLE_PROFILING = os.environ.get(\"ENABLE_PROFILING\", \"false\"\
-          ).lower() == \"true\"\n        VERBOSE = os.environ.get(\"VERBOSE\", \"\
-          true\").lower() == \"true\"\n\n        def log_verbose(msg):\n         \
-          \   \"\"\"Log message if VERBOSE is enabled.\"\"\"\n            if VERBOSE:\n\
+          \ str = \"\",\n    pipeline_run_id: str = \"\",\n) -> str:\n    \"\"\"Parse\
+          \ PDFs and write chunked JSONL files to S3.\n\n    Args:\n        pvc_name:\
+          \ Name of the PVC with input PDFs.\n        pvc_mount_path: Mount path for\
+          \ the PVC inside pods.\n        input_path: Relative path to input PDFs\
+          \ under the PVC.\n        ray_image: Container image with Ray + Docling\
+          \ pre-installed.\n        namespace: OpenShift namespace for the RayJob.\n\
+          \        s3_endpoint: S3-compatible endpoint URL (e.g. MinIO).\n       \
+          \ s3_bucket: S3 bucket for output chunks.\n        s3_prefix: Key prefix\
+          \ for chunk files in S3.\n        s3_secret_name: Kubernetes Secret with\
+          \ S3 credentials (keys: access_key, secret_key).\n        tokenizer: Tokenizer\
+          \ for HybridChunker (usually the embedding model name).\n        chunk_max_tokens:\
+          \ Max tokens per chunk (HybridChunker).\n        num_workers: Number of\
+          \ Ray worker pods.\n        worker_cpus: CPUs per worker pod.\n        worker_memory_gb:\
+          \ Memory (GB) per worker pod.\n        head_cpus: CPUs for the Ray head\
+          \ pod.\n        head_memory_gb: Memory (GB) for the Ray head pod.\n    \
+          \    cpus_per_actor: CPUs per Docling processing actor.\n        min_actors:\
+          \ Minimum actor pool size.\n        max_actors: Maximum actor pool size.\n\
+          \        batch_size: Files per batch sent to each actor.\n        num_files:\
+          \ Number of PDFs to process (0 = all).\n        timeout_seconds: Per-file\
+          \ processing timeout.\n        enable_profiling: Enable cProfile profiling\
+          \ (outputs profile stats).\n        verbose: Enable verbose logging for\
+          \ debugging.\n        bypass_kueue: If True, remove the Kueue queue-name\
+          \ label and manually\n            unsuspend the RayJob, bypassing cluster\
+          \ quota management. Only use\n            on clusters without Kueue or with\
+          \ sufficient free resources.\n\n    Returns:\n        The S3 URI where JSONL\
+          \ chunk files were written.\n    \"\"\"\n    import base64\n    import textwrap\n\
+          \    import time\n\n    # Entrypoint script that runs on the Ray cluster.\n\
+          \    # It parses PDFs with Docling, chunks with HybridChunker,\n    # and\
+          \ writes JSONL files to S3.\n    _DOCLING_CHUNK_PROCESS_PY = textwrap.dedent('''\\\
+          \n        \"\"\"Ray Data + Docling: parse PDFs and chunk with HybridChunker.\"\
+          \"\"\n\n        import glob\n        import io\n        import json\n  \
+          \      import multiprocessing as mp\n        import os\n        import queue\n\
+          \        import time\n        from typing import Dict, List\n\n        import\
+          \ pandas as pd\n        import ray\n\n        MIN_ACTORS = int(os.environ.get(\"\
+          MIN_ACTORS\", \"2\"))\n        MAX_ACTORS = int(os.environ.get(\"MAX_ACTORS\"\
+          , \"4\"))\n        CPUS_PER_ACTOR = int(os.environ.get(\"CPUS_PER_ACTOR\"\
+          , \"4\"))\n        BATCH_SIZE = int(os.environ.get(\"BATCH_SIZE\", \"4\"\
+          ))\n        REPARTITION_FACTOR = int(os.environ.get(\"REPARTITION_FACTOR\"\
+          , \"10\"))\n\n        PVC_MOUNT_PATH = os.environ.get(\"PVC_MOUNT_PATH\"\
+          , \"/mnt/data\")\n        INPUT_PATH = os.environ.get(\"INPUT_PATH\", \"\
+          input/pdfs\")\n        NUM_FILES = int(os.environ.get(\"NUM_FILES\", \"\
+          0\"))\n\n        FILE_TIMEOUT = int(os.environ.get(\"FILE_TIMEOUT\", \"\
+          600\"))\n        MAX_ERRORED_BLOCKS = int(os.environ.get(\"MAX_ERRORED_BLOCKS\"\
+          , \"50\"))\n\n        CHUNK_MAX_TOKENS = int(os.environ.get(\"CHUNK_MAX_TOKENS\"\
+          , \"256\"))\n        TOKENIZER = os.environ.get(\"TOKENIZER\", \"sentence-transformers/all-MiniLM-L6-v2\"\
+          )\n\n        S3_ENDPOINT = os.environ.get(\"S3_ENDPOINT\", \"\")\n     \
+          \   S3_BUCKET = os.environ.get(\"S3_BUCKET\", \"rag-chunks\")\n        S3_PREFIX\
+          \ = os.environ.get(\"S3_PREFIX\", \"chunks\")\n        S3_ACCESS_KEY = os.environ.get(\"\
+          S3_ACCESS_KEY\", \"\")\n        S3_SECRET_KEY = os.environ.get(\"S3_SECRET_KEY\"\
+          , \"\")\n\n        ENABLE_PROFILING = os.environ.get(\"ENABLE_PROFILING\"\
+          , \"false\").lower() == \"true\"\n        VERBOSE = os.environ.get(\"VERBOSE\"\
+          , \"true\").lower() == \"true\"\n\n        def log_verbose(msg):\n     \
+          \       \"\"\"Log message if VERBOSE is enabled.\"\"\"\n            if VERBOSE:\n\
           \                print(f\"[VERBOSE] {msg}\", flush=True)\n\n\n        def\
           \ _get_s3_client():\n            import boto3\n            return boto3.client(\n\
           \                \"s3\",\n                endpoint_url=S3_ENDPOINT,\n  \
@@ -993,8 +1029,8 @@ deploymentSpec:
           : tokenizer,\n                    \"num_workers\": num_workers,\n      \
           \              \"duration_seconds\": round(duration_seconds, 2),\n     \
           \           },\n            },\n        }\n\n        ol_run_facets = {}\n\
-          \        _pipeline_run_id = os.environ.get(\"PIPELINE_RUN_ID\", \"\")\n\
-          \        if _pipeline_run_id:\n            ol_run_facets[\"pipelineRunId\"\
+          \        _pipeline_run_id = pipeline_run_id or os.environ.get(\"PIPELINE_RUN_ID\"\
+          , \"\")\n        if _pipeline_run_id:\n            ol_run_facets[\"pipelineRunId\"\
           ] = {\n                \"_producer\": \"rhoai-lineage\",\n             \
           \   \"_schemaURL\": \"https://openlineage.io/spec/1-0-0/OpenLineage.json\"\
           ,\n                \"id\": _pipeline_run_id,\n            }\n\n        with\
@@ -1003,39 +1039,69 @@ deploymentSpec:
           \        ):\n            pass\n        print(\"OpenLineage COMPLETE event\
           \ emitted for parse_and_chunk\")\n    except Exception as e:\n        print(f\"\
           WARNING: OpenLineage emission failed (non-fatal): {e}\")\n\n    # --- MLflow\
-          \ tracking (best-effort) ---\n    try:\n        import mlflow\n        import\
-          \ mlflow.utils.rest_utils as _mlflow_rest\n\n        sa_token_path = \"\
-          /var/run/secrets/kubernetes.io/serviceaccount/token\"\n        sa_ns_path\
-          \ = \"/var/run/secrets/kubernetes.io/serviceaccount/namespace\"\n      \
-          \  _mlflow_workspace = \"\"\n        if os.path.exists(sa_token_path):\n\
-          \            with open(sa_token_path) as f:\n                os.environ[\"\
-          MLFLOW_TRACKING_TOKEN\"] = f.read().strip()\n            if os.path.exists(sa_ns_path):\n\
-          \                with open(sa_ns_path) as f:\n                    _mlflow_workspace\
-          \ = f.read().strip()\n        os.environ[\"MLFLOW_TRACKING_INSECURE_TLS\"\
-          ] = \"true\"\n\n        # The RHOAI MLflow Operator requires X-Mlflow-Workspace\
-          \ on every\n        # request.  The vanilla client doesn't support this\
-          \ header, so we\n        # patch http_request to inject it.\n        if\
-          \ _mlflow_workspace:\n            _orig_http_request = _mlflow_rest.http_request\n\
-          \            def _workspace_http_request(*args, **kwargs):\n           \
-          \     eh = kwargs.get(\"extra_headers\") or {}\n                eh[\"X-Mlflow-Workspace\"\
-          ] = _mlflow_workspace\n                kwargs[\"extra_headers\"] = eh\n\
-          \                return _orig_http_request(*args, **kwargs)\n          \
-          \  _mlflow_rest.http_request = _workspace_http_request\n\n        mlflow_uri\
-          \ = os.environ.get(\n            \"MLFLOW_TRACKING_URI\",\n            \"\
-          https://mlflow.redhat-ods-applications.svc:8443\",\n        )\n        mlflow.set_tracking_uri(mlflow_uri)\n\
-          \        mlflow.set_experiment(\n            os.environ.get(\"OPENLINEAGE_NAMESPACE\"\
-          , \"data-strat-poc\")\n        )\n\n        duration_seconds = time.time()\
-          \ - start_time\n        with mlflow.start_run(run_name=\"parse_and_chunk\"\
-          ):\n            mlflow.log_params({\n                \"num_files\": str(num_files),\n\
-          \                \"chunk_max_tokens\": str(chunk_max_tokens),\n        \
-          \        \"embedding_model\": tokenizer,\n                \"num_workers\"\
-          : str(num_workers),\n                \"s3_bucket\": s3_bucket,\n       \
-          \         \"s3_prefix\": s3_prefix,\n                \"ray_image\": ray_image,\n\
-          \                \"namespace\": namespace,\n            })\n           \
-          \ mlflow.log_metrics({\n                \"duration_seconds\": round(duration_seconds,\
-          \ 2),\n            })\n        print(\"MLflow run logged for parse_and_chunk\"\
-          )\n    except Exception as e:\n        print(f\"WARNING: MLflow tracking\
-          \ failed (non-fatal): {e}\")\n\n    return f\"s3://{s3_bucket}/{s3_prefix}\"\
+          \ tracking via REST API (best-effort) ---\n    # Direct REST calls with\
+          \ SA token auth \u2014 the RHOAI MLflow Operator\n    # requires Authorization\
+          \ + X-Mlflow-Workspace headers that the vanilla\n    # mlflow client doesn't\
+          \ inject from KFP pods.\n    try:\n        import requests as _req\n\n \
+          \       class _MLflowRESTTracker:\n            def __init__(self):\n   \
+          \             self._url = \"https://mlflow.redhat-ods-applications.svc:8443\"\
+          \n                self._headers = {\"Content-Type\": \"application/json\"\
+          }\n                self._run_id = None\n                self._experiment_id\
+          \ = None\n                _sa_token = \"/var/run/secrets/kubernetes.io/serviceaccount/token\"\
+          \n                _sa_ns = \"/var/run/secrets/kubernetes.io/serviceaccount/namespace\"\
+          \n                if os.path.exists(_sa_token):\n                    with\
+          \ open(_sa_token) as f:\n                        self._headers[\"Authorization\"\
+          ] = f\"Bearer {f.read().strip()}\"\n                if os.path.exists(_sa_ns):\n\
+          \                    with open(_sa_ns) as f:\n                        self._headers[\"\
+          X-Mlflow-Workspace\"] = f.read().strip()\n\n            def _post(self,\
+          \ endpoint, data):\n                resp = _req.post(f\"{self._url}{endpoint}\"\
+          , json=data,\n                                 headers=self._headers, verify=False,\
+          \ timeout=10)\n                resp.raise_for_status()\n               \
+          \ return resp.json()\n\n            def create_experiment(self, name):\n\
+          \                try:\n                    result = self._post(\"/api/2.0/mlflow/experiments/create\"\
+          , {\"name\": name})\n                    self._experiment_id = result.get(\"\
+          experiment_id\")\n                except Exception:\n                  \
+          \  resp = _req.get(f\"{self._url}/api/2.0/mlflow/experiments/get-by-name\"\
+          ,\n                                    params={\"experiment_name\": name},\n\
+          \                                    headers=self._headers, verify=False,\
+          \ timeout=10)\n                    if resp.ok:\n                       \
+          \ self._experiment_id = resp.json().get(\"experiment\", {}).get(\"experiment_id\"\
+          )\n                return self._experiment_id\n\n            def start_run(self,\
+          \ run_name=\"\"):\n                if not self._experiment_id:\n       \
+          \             return None\n                result = self._post(\"/api/2.0/mlflow/runs/create\"\
+          , {\n                    \"experiment_id\": self._experiment_id, \"run_name\"\
+          : run_name,\n                })\n                self._run_id = result.get(\"\
+          run\", {}).get(\"info\", {}).get(\"run_id\")\n                return self._run_id\n\
+          \n            def log_param(self, key, value):\n                if not self._run_id:\n\
+          \                    return\n                self._post(\"/api/2.0/mlflow/runs/log-parameter\"\
+          , {\n                    \"run_id\": self._run_id, \"key\": key, \"value\"\
+          : str(value),\n                })\n\n            def log_metric(self, key,\
+          \ value):\n                if not self._run_id:\n                    return\n\
+          \                self._post(\"/api/2.0/mlflow/runs/log-metric\", {\n   \
+          \                 \"run_id\": self._run_id, \"key\": key, \"value\": float(value),\n\
+          \                    \"timestamp\": int(time.time() * 1000),\n         \
+          \       })\n\n            def end_run(self, status=\"FINISHED\"):\n    \
+          \            if not self._run_id:\n                    return\n        \
+          \        self._post(\"/api/2.0/mlflow/runs/update\", {\n               \
+          \     \"run_id\": self._run_id, \"status\": status,\n                  \
+          \  \"end_time\": int(time.time() * 1000),\n                })\n\n      \
+          \  duration_seconds = time.time() - start_time\n        tracker = _MLflowRESTTracker()\n\
+          \        tracker.create_experiment(\"data-strat-ingest\")\n        tracker.start_run(run_name=f\"\
+          parse-{rayjob_name}\")\n        tracker.log_param(\"pipeline_run_id\", pipeline_run_id\
+          \ or \"unknown\")\n        tracker.log_param(\"num_files\", str(num_files))\n\
+          \        tracker.log_param(\"chunk_max_tokens\", str(chunk_max_tokens))\n\
+          \        tracker.log_param(\"embedding_model\", tokenizer)\n        tracker.log_param(\"\
+          num_workers\", str(num_workers))\n        tracker.log_param(\"worker_cpus\"\
+          , str(worker_cpus))\n        tracker.log_param(\"worker_memory_gb\", str(worker_memory_gb))\n\
+          \        tracker.log_param(\"s3_bucket\", s3_bucket)\n        tracker.log_param(\"\
+          s3_prefix\", s3_prefix)\n        tracker.log_param(\"doc_category\", doc_category)\n\
+          \        tracker.log_param(\"doc_subcategory\", doc_subcategory)\n     \
+          \   tracker.log_param(\"doc_date\", doc_date)\n        tracker.log_param(\"\
+          ray_image\", ray_image)\n        tracker.log_param(\"namespace\", namespace)\n\
+          \        tracker.log_metric(\"duration_seconds\", duration_seconds)\n  \
+          \      tracker.end_run()\n        print(\"MLflow: logged parse run to experiment\
+          \ 'data-strat-ingest'\")\n    except Exception as e:\n        print(f\"\
+          MLflow tracking failed (non-blocking): {e}\")\n\n    return f\"s3://{s3_bucket}/{s3_prefix}\"\
           \n\n"
         image: registry.redhat.io/rhoai/odh-pipeline-runtime-datascience-cpu-py312-rhel9@sha256:f9844dc150592a9f196283b3645dda92bd80dfdb3d467fa8725b10267ea5bdbc
 pipelineInfo:
@@ -1126,6 +1192,8 @@ root:
               componentInputParameter: num_files
             num_workers:
               componentInputParameter: num_workers
+            pipeline_run_id:
+              componentInputParameter: pipeline_run_id
             pvc_mount_path:
               componentInputParameter: pvc_mount_path
             pvc_name:

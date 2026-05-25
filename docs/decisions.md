@@ -93,6 +93,27 @@ Both pipelines are exported from the same package. The compiled YAML for the ing
 
 **Consequences:** Simpler pipeline for early milestones — fewer parameters, no GPU requirements, faster runs. The full pipeline remains available and tested. When M4 starts, the team switches back to `rag_multistep_pipeline` (or extends the ingest pipeline with query steps).
 
+### DEC-008: Multi-collection architecture for Scenario B
+**Date:** 2026-05-25
+**Milestone:** M2 (captured for M3 execution)
+**Status:** Decided
+
+**Context:** Scenario B specifies three document collections for the P&C underwriting knowledge assistant, each serving different personas and query patterns. M1-M2 used a single `underwriting_guidelines` collection with all 11 test PDFs mixed together. The compliance review agent (UC-003) requires multi-hop retrieval across all three collections.
+
+**Decision:** Run the ingest pipeline **separately per collection** with different parameters:
+
+| Pipeline Run | Collection | Input Documents | Category |
+|-------------|------------|-----------------|----------|
+| Run 1 | `underwriting_guidelines` | Company guidelines by LOB | Per-LOB (commercial_property, workers_comp, etc.) |
+| Run 2 | `iso_forms` | ISO/ACORD standard forms | Per form series |
+| Run 3 | `regulatory_bulletins` | State DOI bulletins, NAIC guidance | Per jurisdiction |
+
+Each run gets its own `pipeline_run_id`, lineage graph, and MLflow experiment run. The collections share the same schema (ADR-002) but contain different document types.
+
+At M3, connectors route documents from different sources to the appropriate collection. At M4, OGX queries across all three collections for the compliance review agent.
+
+**Consequences:** The pipeline already supports this -- `collection_name` is a parameter. No code changes needed. M3 must implement: (a) corpus organisation by collection, (b) per-collection pipeline runs, (c) per-document metadata from manifests (PG-020). The compliance review agent (M5) depends on all three collections being populated.
+
 ### DEC-006: Git tagging convention for milestones and phases
 **Date:** 2026-05-25
 **Milestone:** M1
