@@ -1,0 +1,29 @@
+# MLflow RBAC for pipeline service account
+# Required for PG-024 fix: KFP pods need permissions on mlflow.kubeflow.org
+# resources to create experiments and log runs via the RHOAI MLflow Operator
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mlflow-user
+  namespace: data-strat-poc
+rules:
+  - apiGroups: ["mlflow.kubeflow.org"]
+    resources: ["experiments", "runs", "models"]
+    verbs: ["create", "get", "list", "update", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mlflow-pipeline-user
+  namespace: data-strat-poc
+subjects:
+  - kind: ServiceAccount
+    name: pipeline-runner-dspa
+    namespace: data-strat-poc
+  - kind: ServiceAccount
+    name: default
+    namespace: data-strat-poc
+roleRef:
+  kind: Role
+  name: mlflow-user
+  apiGroup: rbac.authorization.k8s.io

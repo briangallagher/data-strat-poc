@@ -436,17 +436,32 @@ deploymentSpec:
           embedding_dim\": embedding_dim,\n                    \"collection_name\"\
           : collection_name,\n                    \"index_type\": index_type,\n  \
           \                  \"duration_seconds\": round(wall_clock, 2),\n       \
-          \         },\n            },\n        }\n\n        with kfp_lineage(\n \
-          \           \"ingest_to_milvus\",\n            inputs=[input_ds],\n    \
-          \        outputs=[output_ds],\n        ):\n            pass\n        print(\"\
-          OpenLineage COMPLETE event emitted for ingest_to_milvus\")\n    except Exception\
-          \ as e:\n        print(f\"WARNING: OpenLineage emission failed (non-fatal):\
-          \ {e}\")\n\n    # --- MLflow tracking (best-effort) ---\n    try:\n    \
-          \    import mlflow\n\n        sa_token_path = \"/var/run/secrets/kubernetes.io/serviceaccount/token\"\
-          \n        if os.path.exists(sa_token_path):\n            with open(sa_token_path)\
-          \ as f:\n                sa_token = f.read().strip()\n            os.environ[\"\
-          MLFLOW_TRACKING_TOKEN\"] = sa_token\n        os.environ[\"MLFLOW_TRACKING_INSECURE_TLS\"\
-          ] = \"true\"\n\n        mlflow_uri = os.environ.get(\n            \"MLFLOW_TRACKING_URI\"\
+          \         },\n            },\n        }\n\n        ol_run_facets = {}\n\
+          \        if pipeline_run_id:\n            ol_run_facets[\"pipelineRunId\"\
+          ] = {\n                \"_producer\": \"rhoai-lineage\",\n             \
+          \   \"_schemaURL\": \"https://openlineage.io/spec/1-0-0/OpenLineage.json\"\
+          ,\n                \"id\": pipeline_run_id,\n            }\n\n        with\
+          \ kfp_lineage(\n            \"ingest_to_milvus\",\n            inputs=[input_ds],\n\
+          \            outputs=[output_ds],\n            run_facets=ol_run_facets,\n\
+          \        ):\n            pass\n        print(\"OpenLineage COMPLETE event\
+          \ emitted for ingest_to_milvus\")\n    except Exception as e:\n        print(f\"\
+          WARNING: OpenLineage emission failed (non-fatal): {e}\")\n\n    # --- MLflow\
+          \ tracking (best-effort) ---\n    try:\n        import mlflow\n        import\
+          \ mlflow.utils.rest_utils as _mlflow_rest\n\n        sa_token_path = \"\
+          /var/run/secrets/kubernetes.io/serviceaccount/token\"\n        sa_ns_path\
+          \ = \"/var/run/secrets/kubernetes.io/serviceaccount/namespace\"\n      \
+          \  _mlflow_workspace = \"\"\n        if os.path.exists(sa_token_path):\n\
+          \            with open(sa_token_path) as f:\n                os.environ[\"\
+          MLFLOW_TRACKING_TOKEN\"] = f.read().strip()\n            if os.path.exists(sa_ns_path):\n\
+          \                with open(sa_ns_path) as f:\n                    _mlflow_workspace\
+          \ = f.read().strip()\n        os.environ[\"MLFLOW_TRACKING_INSECURE_TLS\"\
+          ] = \"true\"\n\n        if _mlflow_workspace:\n            _orig_http_request\
+          \ = _mlflow_rest.http_request\n            def _workspace_http_request(*args,\
+          \ **kwargs):\n                eh = kwargs.get(\"extra_headers\") or {}\n\
+          \                eh[\"X-Mlflow-Workspace\"] = _mlflow_workspace\n      \
+          \          kwargs[\"extra_headers\"] = eh\n                return _orig_http_request(*args,\
+          \ **kwargs)\n            _mlflow_rest.http_request = _workspace_http_request\n\
+          \n        mlflow_uri = os.environ.get(\n            \"MLFLOW_TRACKING_URI\"\
           ,\n            \"https://mlflow.redhat-ods-applications.svc:8443\",\n  \
           \      )\n        mlflow.set_tracking_uri(mlflow_uri)\n        mlflow.set_experiment(\n\
           \            os.environ.get(\"OPENLINEAGE_NAMESPACE\", \"data-strat-poc\"\
@@ -977,23 +992,41 @@ deploymentSpec:
           chunk_max_tokens\": chunk_max_tokens,\n                    \"tokenizer\"\
           : tokenizer,\n                    \"num_workers\": num_workers,\n      \
           \              \"duration_seconds\": round(duration_seconds, 2),\n     \
-          \           },\n            },\n        }\n\n        with kfp_lineage(\n\
-          \            \"parse_and_chunk\",\n            inputs=[input_ds],\n    \
-          \        outputs=[output_ds],\n        ):\n            pass\n        print(\"\
-          OpenLineage COMPLETE event emitted for parse_and_chunk\")\n    except Exception\
-          \ as e:\n        print(f\"WARNING: OpenLineage emission failed (non-fatal):\
-          \ {e}\")\n\n    # --- MLflow tracking (best-effort) ---\n    try:\n    \
-          \    import mlflow\n\n        sa_token_path = \"/var/run/secrets/kubernetes.io/serviceaccount/token\"\
-          \n        if os.path.exists(sa_token_path):\n            with open(sa_token_path)\
-          \ as f:\n                sa_token = f.read().strip()\n            os.environ[\"\
-          MLFLOW_TRACKING_TOKEN\"] = sa_token\n        os.environ[\"MLFLOW_TRACKING_INSECURE_TLS\"\
-          ] = \"true\"\n\n        mlflow_uri = os.environ.get(\n            \"MLFLOW_TRACKING_URI\"\
-          ,\n            \"https://mlflow.redhat-ods-applications.svc:8443\",\n  \
-          \      )\n        mlflow.set_tracking_uri(mlflow_uri)\n        mlflow.set_experiment(\n\
-          \            os.environ.get(\"OPENLINEAGE_NAMESPACE\", \"data-strat-poc\"\
-          )\n        )\n\n        duration_seconds = time.time() - start_time\n  \
-          \      with mlflow.start_run(run_name=\"parse_and_chunk\"):\n          \
-          \  mlflow.log_params({\n                \"num_files\": str(num_files),\n\
+          \           },\n            },\n        }\n\n        ol_run_facets = {}\n\
+          \        _pipeline_run_id = os.environ.get(\"PIPELINE_RUN_ID\", \"\")\n\
+          \        if _pipeline_run_id:\n            ol_run_facets[\"pipelineRunId\"\
+          ] = {\n                \"_producer\": \"rhoai-lineage\",\n             \
+          \   \"_schemaURL\": \"https://openlineage.io/spec/1-0-0/OpenLineage.json\"\
+          ,\n                \"id\": _pipeline_run_id,\n            }\n\n        with\
+          \ kfp_lineage(\n            \"parse_and_chunk\",\n            inputs=[input_ds],\n\
+          \            outputs=[output_ds],\n            run_facets=ol_run_facets,\n\
+          \        ):\n            pass\n        print(\"OpenLineage COMPLETE event\
+          \ emitted for parse_and_chunk\")\n    except Exception as e:\n        print(f\"\
+          WARNING: OpenLineage emission failed (non-fatal): {e}\")\n\n    # --- MLflow\
+          \ tracking (best-effort) ---\n    try:\n        import mlflow\n        import\
+          \ mlflow.utils.rest_utils as _mlflow_rest\n\n        sa_token_path = \"\
+          /var/run/secrets/kubernetes.io/serviceaccount/token\"\n        sa_ns_path\
+          \ = \"/var/run/secrets/kubernetes.io/serviceaccount/namespace\"\n      \
+          \  _mlflow_workspace = \"\"\n        if os.path.exists(sa_token_path):\n\
+          \            with open(sa_token_path) as f:\n                os.environ[\"\
+          MLFLOW_TRACKING_TOKEN\"] = f.read().strip()\n            if os.path.exists(sa_ns_path):\n\
+          \                with open(sa_ns_path) as f:\n                    _mlflow_workspace\
+          \ = f.read().strip()\n        os.environ[\"MLFLOW_TRACKING_INSECURE_TLS\"\
+          ] = \"true\"\n\n        # The RHOAI MLflow Operator requires X-Mlflow-Workspace\
+          \ on every\n        # request.  The vanilla client doesn't support this\
+          \ header, so we\n        # patch http_request to inject it.\n        if\
+          \ _mlflow_workspace:\n            _orig_http_request = _mlflow_rest.http_request\n\
+          \            def _workspace_http_request(*args, **kwargs):\n           \
+          \     eh = kwargs.get(\"extra_headers\") or {}\n                eh[\"X-Mlflow-Workspace\"\
+          ] = _mlflow_workspace\n                kwargs[\"extra_headers\"] = eh\n\
+          \                return _orig_http_request(*args, **kwargs)\n          \
+          \  _mlflow_rest.http_request = _workspace_http_request\n\n        mlflow_uri\
+          \ = os.environ.get(\n            \"MLFLOW_TRACKING_URI\",\n            \"\
+          https://mlflow.redhat-ods-applications.svc:8443\",\n        )\n        mlflow.set_tracking_uri(mlflow_uri)\n\
+          \        mlflow.set_experiment(\n            os.environ.get(\"OPENLINEAGE_NAMESPACE\"\
+          , \"data-strat-poc\")\n        )\n\n        duration_seconds = time.time()\
+          \ - start_time\n        with mlflow.start_run(run_name=\"parse_and_chunk\"\
+          ):\n            mlflow.log_params({\n                \"num_files\": str(num_files),\n\
           \                \"chunk_max_tokens\": str(chunk_max_tokens),\n        \
           \        \"embedding_model\": tokenizer,\n                \"num_workers\"\
           : str(num_workers),\n                \"s3_bucket\": s3_bucket,\n       \

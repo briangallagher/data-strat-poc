@@ -66,8 +66,8 @@ Issues with OpenLineage, Marquez, MLflow, and audit logging.
 | PG-021 | rhoai-lineage installed via git URL | No PyPI package; `pip install git+https://...` is slow (~30s) in KFP pods | Published wheel on PyPI or internal registry | Build and publish wheel once API stabilises | Open |
 | PG-022 | Marquez deployed in same namespace | No network isolation between lineage backend and pipeline workloads | Separate namespace (`data-strat-lineage`) with NetworkPolicy | Redeploy Marquez to isolated namespace | Open |
 | PG-023 | Lineage operator not deployed | Deferred from M2 — not in critical path for pipeline-time lineage | Operator deployed for agent-level lineage (M4/M5) | Deploy when OGX query path is implemented | Open |
-| PG-024 | MLflow tracking doesn't work from KFP pods | RHOAI MLflow Operator requires SA token + X-Mlflow-Workspace header; standard mlflow client doesn't inject these | Transparent auth from any KFP pod via custom request hook or env config | Implement mlflow.set_http_request_hook() or operator-side token injection | Open |
-| PG-025 | pipeline_run_id not in Marquez run facets | rhoai-lineage emits OL events without parent run facet containing KFP pipeline_run_id | Cross-system correlation via ID (not timestamp) | Emit `parent` run facet with pipeline_run_id in rhoai-lineage | Open |
+| PG-024 | MLflow tracking from KFP pods | RHOAI MLflow Operator requires SA token + workspace header | Transparent auth via K8s auth plugin | **Fixed:** REST API with explicit SA token + K8s RBAC for `mlflow.kubeflow.org` resources. Requires Role/RoleBinding in manifests. | **Closed** |
+| PG-025 | pipeline_run_id not in Marquez run facets | OL events didn't include pipeline_run_id as a custom facet | Cross-system correlation via pipeline_run_id | **Fixed:** Added `pipelineRunId` custom run facet in rhoai-lineage OL emission. Also logged as MLflow param. | **Closed** |
 
 ## Connectors / Data Ingestion
 
@@ -98,7 +98,7 @@ Cross-cutting security and platform infrastructure gaps.
 | Ray / RayData / Docling | 2 | 0 | 2 |
 | Milvus / Vector Storage | 5 | 0 | 5 |
 | Embedding / Model Serving | 2 | 1 | 1 |
-| Lineage / Observability | 9 | 0 | 9 |
+| Lineage / Observability | 9 | 2 (closed) | 7 |
 | Connectors / Data Ingestion | 3 | 0 | 3 |
 | Security / Platform | 2 | 0 | 2 |
-| **Total** | **25** | **2** | **23** |
+| **Total** | **25** | **4** | **21** |
