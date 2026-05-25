@@ -3,7 +3,7 @@
 Every deviation from enterprise/production standard is tracked here. Nothing is silently accepted.
 
 **Updated at:** every milestone checkpoint.
-**Last Updated:** 2026-05-23 (M1 Phase 0 complete — 19 gaps tracked)
+**Last Updated:** 2026-05-25 (M1 complete — 20 gaps tracked, PG-020 added in Phase 1)
 
 ## How to Use
 
