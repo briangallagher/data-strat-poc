@@ -277,8 +277,9 @@ deploymentSpec:
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
           \ python3 -m pip install --quiet --no-warn-script-location 'pymilvus>=2.4.0'\
-          \ 'sentence-transformers>=2.2.0' 'requests>=2.28.0' 'boto3>=1.28.0'  &&\
-          \  python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
+          \ 'sentence-transformers>=2.2.0' 'requests>=2.28.0' 'boto3>=1.28.0' 'rhoai-lineage\
+          \ @ git+https://github.com/briangallagher/rhoai-lineage.git' 'mlflow>=2.0.0'\
+          \  &&  python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.1'\
           \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
           $0\" \"$@\"\n"
         - sh
@@ -416,7 +417,52 @@ deploymentSpec:
           \    stats = client.get_collection_stats(collection_name)\n\n    wall_clock\
           \ = time.time() - start_time\n    print(f\"\\nIngestion complete: {total_inserted}\
           \ vectors in {wall_clock:.1f}s\")\n    print(f\"Collection stats: {stats}\"\
-          )\n\n    return f\"{collection_name}:{total_inserted}\"\n\n"
+          )\n\n    # --- OpenLineage emission (best-effort) ---\n    try:\n      \
+          \  from rhoai_lineage.kfp.lineage import kfp_lineage\n        from rhoai_lineage.naming\
+          \ import s3_dataset, milvus_dataset\n        from urllib.parse import urlparse\
+          \ as _urlparse\n\n        _s3_parsed = _urlparse(s3_endpoint)\n        _s3_host\
+          \ = _s3_parsed.hostname or \"minio\"\n        _s3_port = _s3_parsed.port\
+          \ or 9000\n\n        input_ns, input_name = s3_dataset(\n            bucket=s3_bucket,\
+          \ path=s3_prefix, host=_s3_host, port=_s3_port,\n        )\n        input_ds\
+          \ = {\"namespace\": input_ns, \"name\": input_name}\n\n        output_ns,\
+          \ output_name = milvus_dataset(\n            collection=collection_name,\
+          \ host=milvus_host, port=milvus_port,\n        )\n        output_ds = {\n\
+          \            \"namespace\": output_ns,\n            \"name\": output_name,\n\
+          \            \"facets\": {\n                \"custom_metrics\": {\n    \
+          \                \"_producer\": \"https://github.com/rhoai-lineage\",\n\
+          \                    \"_schemaURL\": \"https://openlineage.io/spec/2-0-2/OpenLineage.json#/$defs/CustomFacet\"\
+          ,\n                    \"vectors_inserted\": total_inserted,\n         \
+          \           \"embedding_model\": embedding_model,\n                    \"\
+          embedding_dim\": embedding_dim,\n                    \"collection_name\"\
+          : collection_name,\n                    \"index_type\": index_type,\n  \
+          \                  \"duration_seconds\": round(wall_clock, 2),\n       \
+          \         },\n            },\n        }\n\n        with kfp_lineage(\n \
+          \           \"ingest_to_milvus\",\n            inputs=[input_ds],\n    \
+          \        outputs=[output_ds],\n        ):\n            pass\n        print(\"\
+          OpenLineage COMPLETE event emitted for ingest_to_milvus\")\n    except Exception\
+          \ as e:\n        print(f\"WARNING: OpenLineage emission failed (non-fatal):\
+          \ {e}\")\n\n    # --- MLflow tracking (best-effort) ---\n    try:\n    \
+          \    import mlflow\n\n        sa_token_path = \"/var/run/secrets/kubernetes.io/serviceaccount/token\"\
+          \n        if os.path.exists(sa_token_path):\n            with open(sa_token_path)\
+          \ as f:\n                sa_token = f.read().strip()\n            os.environ[\"\
+          MLFLOW_TRACKING_TOKEN\"] = sa_token\n        os.environ[\"MLFLOW_TRACKING_INSECURE_TLS\"\
+          ] = \"true\"\n\n        mlflow_uri = os.environ.get(\n            \"MLFLOW_TRACKING_URI\"\
+          ,\n            \"https://mlflow.redhat-ods-applications.svc:8443\",\n  \
+          \      )\n        mlflow.set_tracking_uri(mlflow_uri)\n        mlflow.set_experiment(\n\
+          \            os.environ.get(\"OPENLINEAGE_NAMESPACE\", \"data-strat-poc\"\
+          )\n        )\n\n        with mlflow.start_run(run_name=\"ingest_to_milvus\"\
+          ):\n            mlflow.log_params({\n                \"collection_name\"\
+          : collection_name,\n                \"embedding_model\": embedding_model,\n\
+          \                \"embedding_dim\": str(embedding_dim),\n              \
+          \  \"milvus_host\": milvus_host,\n                \"index_type\": index_type,\n\
+          \                \"pipeline_run_id\": pipeline_run_id or \"unknown\",\n\
+          \                \"drop_existing\": str(drop_existing),\n            })\n\
+          \            mlflow.log_metrics({\n                \"vectors_inserted\"\
+          : float(total_inserted),\n                \"duration_seconds\": round(wall_clock,\
+          \ 2),\n                \"source_files\": float(file_count),\n          \
+          \  })\n        print(\"MLflow run logged for ingest_to_milvus\")\n    except\
+          \ Exception as e:\n        print(f\"WARNING: MLflow tracking failed (non-fatal):\
+          \ {e}\")\n\n    return f\"{collection_name}:{total_inserted}\"\n\n"
         image: registry.redhat.io/rhoai/odh-pipeline-runtime-datascience-cpu-py312-rhel9@sha256:f9844dc150592a9f196283b3645dda92bd80dfdb3d467fa8725b10267ea5bdbc
     exec-parse-and-chunk:
       container:
@@ -431,7 +477,8 @@ deploymentSpec:
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
           \ python3 -m pip install --quiet --no-warn-script-location 'codeflare-sdk==0.35.0'\
-          \ 'kubernetes>=28.1.0'  &&  python3 -m pip install --quiet --no-warn-script-location\
+          \ 'kubernetes>=28.1.0' 'rhoai-lineage @ git+https://github.com/briangallagher/rhoai-lineage.git'\
+          \ 'mlflow>=2.0.0'  &&  python3 -m pip install --quiet --no-warn-script-location\
           \ 'kfp==2.16.1' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"\
           3.9\"' && \"$0\" \"$@\"\n"
         - sh
@@ -912,7 +959,50 @@ deploymentSpec:
           \ Cluster: {cluster_state}\"\n            )\n\n        print(\n        \
           \    f\"  [{elapsed:.0f}s] Job: {job_status or 'pending'}, Deployment: {deployment_status},\
           \ \"\n            f\"Workers: {ready_workers}/{num_workers}, Cluster: {cluster_state}\"\
-          \n        )\n        time.sleep(15)\n\n    return f\"s3://{s3_bucket}/{s3_prefix}\"\
+          \n        )\n        time.sleep(15)\n\n    # --- OpenLineage emission (best-effort)\
+          \ ---\n    try:\n        from rhoai_lineage.kfp.lineage import kfp_lineage\n\
+          \        from rhoai_lineage.naming import s3_dataset\n        from urllib.parse\
+          \ import urlparse as _urlparse\n\n        duration_seconds = time.time()\
+          \ - start_time\n        _s3_parsed = _urlparse(s3_endpoint)\n        _s3_host\
+          \ = _s3_parsed.hostname or \"minio\"\n        _s3_port = _s3_parsed.port\
+          \ or 9000\n\n        input_ds = {\n            \"namespace\": f\"pvc://{namespace}\"\
+          ,\n            \"name\": f\"{pvc_name}/{input_path}\",\n        }\n    \
+          \    output_ns, output_name = s3_dataset(\n            bucket=s3_bucket,\
+          \ path=s3_prefix, host=_s3_host, port=_s3_port,\n        )\n        output_ds\
+          \ = {\n            \"namespace\": output_ns,\n            \"name\": output_name,\n\
+          \            \"facets\": {\n                \"custom_metrics\": {\n    \
+          \                \"_producer\": \"https://github.com/rhoai-lineage\",\n\
+          \                    \"_schemaURL\": \"https://openlineage.io/spec/2-0-2/OpenLineage.json#/$defs/CustomFacet\"\
+          ,\n                    \"num_files\": num_files,\n                    \"\
+          chunk_max_tokens\": chunk_max_tokens,\n                    \"tokenizer\"\
+          : tokenizer,\n                    \"num_workers\": num_workers,\n      \
+          \              \"duration_seconds\": round(duration_seconds, 2),\n     \
+          \           },\n            },\n        }\n\n        with kfp_lineage(\n\
+          \            \"parse_and_chunk\",\n            inputs=[input_ds],\n    \
+          \        outputs=[output_ds],\n        ):\n            pass\n        print(\"\
+          OpenLineage COMPLETE event emitted for parse_and_chunk\")\n    except Exception\
+          \ as e:\n        print(f\"WARNING: OpenLineage emission failed (non-fatal):\
+          \ {e}\")\n\n    # --- MLflow tracking (best-effort) ---\n    try:\n    \
+          \    import mlflow\n\n        sa_token_path = \"/var/run/secrets/kubernetes.io/serviceaccount/token\"\
+          \n        if os.path.exists(sa_token_path):\n            with open(sa_token_path)\
+          \ as f:\n                sa_token = f.read().strip()\n            os.environ[\"\
+          MLFLOW_TRACKING_TOKEN\"] = sa_token\n        os.environ[\"MLFLOW_TRACKING_INSECURE_TLS\"\
+          ] = \"true\"\n\n        mlflow_uri = os.environ.get(\n            \"MLFLOW_TRACKING_URI\"\
+          ,\n            \"https://mlflow.redhat-ods-applications.svc:8443\",\n  \
+          \      )\n        mlflow.set_tracking_uri(mlflow_uri)\n        mlflow.set_experiment(\n\
+          \            os.environ.get(\"OPENLINEAGE_NAMESPACE\", \"data-strat-poc\"\
+          )\n        )\n\n        duration_seconds = time.time() - start_time\n  \
+          \      with mlflow.start_run(run_name=\"parse_and_chunk\"):\n          \
+          \  mlflow.log_params({\n                \"num_files\": str(num_files),\n\
+          \                \"chunk_max_tokens\": str(chunk_max_tokens),\n        \
+          \        \"embedding_model\": tokenizer,\n                \"num_workers\"\
+          : str(num_workers),\n                \"s3_bucket\": s3_bucket,\n       \
+          \         \"s3_prefix\": s3_prefix,\n                \"ray_image\": ray_image,\n\
+          \                \"namespace\": namespace,\n            })\n           \
+          \ mlflow.log_metrics({\n                \"duration_seconds\": round(duration_seconds,\
+          \ 2),\n            })\n        print(\"MLflow run logged for parse_and_chunk\"\
+          )\n    except Exception as e:\n        print(f\"WARNING: MLflow tracking\
+          \ failed (non-fatal): {e}\")\n\n    return f\"s3://{s3_bucket}/{s3_prefix}\"\
           \n\n"
         image: registry.redhat.io/rhoai/odh-pipeline-runtime-datascience-cpu-py312-rhel9@sha256:f9844dc150592a9f196283b3645dda92bd80dfdb3d467fa8725b10267ea5bdbc
 pipelineInfo:
@@ -1199,6 +1289,17 @@ platforms:
     deploymentSpec:
       executors:
         exec-ingest-to-milvus:
+          configMapAsEnv:
+          - configMapName: data-strat-lineage-config
+            configMapNameParameter:
+              runtimeValue:
+                constant: data-strat-lineage-config
+            keyToEnv:
+            - configMapKey: OPENLINEAGE_URL
+              envVar: OPENLINEAGE_URL
+            - configMapKey: MLFLOW_BRIDGE_ENABLED
+              envVar: MLFLOW_BRIDGE_ENABLED
+            optional: false
           secretAsEnv:
           - keyToEnv:
             - envVar: S3_ACCESS_KEY
@@ -1208,3 +1309,15 @@ platforms:
             optional: false
             secretNameParameter:
               componentInputParameter: s3_secret_name
+        exec-parse-and-chunk:
+          configMapAsEnv:
+          - configMapName: data-strat-lineage-config
+            configMapNameParameter:
+              runtimeValue:
+                constant: data-strat-lineage-config
+            keyToEnv:
+            - configMapKey: OPENLINEAGE_URL
+              envVar: OPENLINEAGE_URL
+            - configMapKey: MLFLOW_BRIDGE_ENABLED
+              envVar: MLFLOW_BRIDGE_ENABLED
+            optional: false

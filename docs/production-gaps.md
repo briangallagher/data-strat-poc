@@ -3,7 +3,7 @@
 Every deviation from enterprise/production standard is tracked here. Nothing is silently accepted.
 
 **Updated at:** every milestone checkpoint.
-**Last Updated:** 2026-05-25 (M1 complete — 20 gaps tracked, PG-020 added in Phase 1)
+**Last Updated:** 2026-05-25 (M2 complete — 25 gaps tracked, PG-021 through PG-025 added)
 
 ## How to Use
 
@@ -63,6 +63,11 @@ Issues with OpenLineage, Marquez, MLflow, and audit logging.
 | PG-002 | No auth on MLflow | MLflow upstream has no real auth system | RHOAI MLflow operator with K8s auth plugin | Adopt `opendatahub-io/mlflow-kubernetes-plugins` | Open |
 | PG-009 | No query/response audit logging (production) | v1 used JSONL file on PVC; `pipeline_run_id` always null | MLflow GenAI traces with structured spans and bridge | Port to MLflow (v1 DEC-022 completion) | Open |
 | PG-013 | OpenLineage emission is manual | No RHOAI component emits OL natively; all explicit in code | Auto-instrumentation or SDK-level emission | rhoai-lineage library abstracts this | Open |
+| PG-021 | rhoai-lineage installed via git URL | No PyPI package; `pip install git+https://...` is slow (~30s) in KFP pods | Published wheel on PyPI or internal registry | Build and publish wheel once API stabilises | Open |
+| PG-022 | Marquez deployed in same namespace | No network isolation between lineage backend and pipeline workloads | Separate namespace (`data-strat-lineage`) with NetworkPolicy | Redeploy Marquez to isolated namespace | Open |
+| PG-023 | Lineage operator not deployed | Deferred from M2 — not in critical path for pipeline-time lineage | Operator deployed for agent-level lineage (M4/M5) | Deploy when OGX query path is implemented | Open |
+| PG-024 | MLflow tracking doesn't work from KFP pods | RHOAI MLflow Operator requires SA token + X-Mlflow-Workspace header; standard mlflow client doesn't inject these | Transparent auth from any KFP pod via custom request hook or env config | Implement mlflow.set_http_request_hook() or operator-side token injection | Open |
+| PG-025 | pipeline_run_id not in Marquez run facets | rhoai-lineage emits OL events without parent run facet containing KFP pipeline_run_id | Cross-system correlation via ID (not timestamp) | Emit `parent` run facet with pipeline_run_id in rhoai-lineage | Open |
 
 ## Connectors / Data Ingestion
 
@@ -93,7 +98,7 @@ Cross-cutting security and platform infrastructure gaps.
 | Ray / RayData / Docling | 2 | 0 | 2 |
 | Milvus / Vector Storage | 5 | 0 | 5 |
 | Embedding / Model Serving | 2 | 1 | 1 |
-| Lineage / Observability | 4 | 0 | 4 |
+| Lineage / Observability | 9 | 0 | 9 |
 | Connectors / Data Ingestion | 3 | 0 | 3 |
 | Security / Platform | 2 | 0 | 2 |
-| **Total** | **20** | **2** | **18** |
+| **Total** | **25** | **2** | **23** |

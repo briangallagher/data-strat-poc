@@ -2,7 +2,7 @@
 
 Step-by-step guide to deploy the system from scratch. Start here after confirming all [prerequisites](prerequisites.md).
 
-**Last Updated:** 2026-05-25 (M1 complete — verified through Phase 2, 11 PDFs, 312 vectors)
+**Last Updated:** 2026-05-25 (M2 complete — lineage + MLflow added)
 
 ## Deployment Order
 
@@ -15,10 +15,14 @@ Components must be deployed in this order due to dependencies:
 4. DSPA                         (needs MinIO)
 5. Milvus                       (independent, but needed before pipeline runs)
 6. RBAC                         (needs DSPA service account to exist)
-7. Upload test data             (needs data-pvc)
-8. Milvus collection setup      (auto-created by pipeline; embedding via local model)
-9. Compile + upload pipeline    (needs DSPA + pipelines-components fork)
-10. Run pipeline                (see runbook)
+7. Marquez + PostgreSQL         (M2 — lineage backend)
+8. Lineage ConfigMap            (M2 — configures OL emission + bridge toggle)
+9. DSP namespace injection      (M2 — OPENLINEAGE_NAMESPACE via downward API)
+10. MLflow                      (M2 — already deployed via RHOAI Operator, no action needed)
+11. Upload test data            (needs data-pvc)
+12. Milvus collection setup     (auto-created by pipeline; embedding via local model)
+13. Compile + upload pipeline   (needs DSPA + pipelines-components fork)
+14. Run pipeline                (see runbook)
 ```
 
 ## Step 1: Create Namespace and Base Resources
@@ -242,6 +246,85 @@ git -C ~/dev/odh/pipelines-components diff m1-p1..m1-p2
 | `m1-p1` | 2026-05-25 | M1 Phase 1: Scenario B metadata adaptations verified (small scale) |
 | `m1-p2` | 2026-05-25 | M1 Phase 2: Full corpus (11 PDFs, 312 vectors), idempotency verified |
 | `m1-complete` | 2026-05-25 | M1 milestone sign-off |
+| `m2-complete` | 2026-05-25 | M2 milestone sign-off: lineage + MLflow |
+
+## M2: Marquez + Lineage Configuration
+
+### Step 7: Deploy Marquez (Lineage Backend)
+
+```bash
+# Deploy PostgreSQL + Marquez API + Web UI
+oc apply -f manifests/marquez/ -n data-strat-poc
+
+# Wait for PostgreSQL
+oc rollout status deployment/marquez-postgres -n data-strat-poc --timeout=2m
+
+# Wait for Marquez API
+oc rollout status deployment/marquez-api -n data-strat-poc --timeout=2m
+
+# Wait for Marquez Web UI
+oc rollout status deployment/marquez-web -n data-strat-poc --timeout=2m
+```
+
+**Expected:** Three deployments Running. Routes created for API and Web UI.
+
+**Verification:**
+```bash
+# API health
+curl -sk "https://marquez-data-strat-poc.apps.dev.aip-ft.rh-ods.com/api/v1/namespaces"
+
+# Web UI
+echo "https://marquez-web-data-strat-poc.apps.dev.aip-ft.rh-ods.com"
+```
+
+**Key gotchas:**
+- PostgreSQL needs `fsGroup` in SecurityContext for PVC write access
+- Marquez API requires `MARQUEZ_CONFIG` env var pointing to config file (not inline YAML)
+- Marquez Web UI needs `WEB_PORT` set explicitly (not `PORT`)
+
+### Step 8: Apply Lineage ConfigMap
+
+```bash
+oc apply -f manifests/marquez/lineage-config.yaml -n data-strat-poc
+```
+
+This creates the `data-strat-lineage-config` ConfigMap with:
+- `MARQUEZ_URL` — internal Marquez API endpoint
+- `MLFLOW_BRIDGE_ENABLED` — `false` by default
+- `MLFLOW_TRACKING_URI` — RHOAI MLflow endpoint
+
+### Step 9: Inject OpenLineage Namespace into DSP
+
+```bash
+./scripts/inject-openlineage-namespace.sh
+```
+
+This patches the DSPA CR to include `OPENLINEAGE_NAMESPACE` from the Kubernetes downward API (`metadata.namespace`). Pipeline pods will automatically receive the namespace as an environment variable.
+
+**Verification:**
+```bash
+# Check DSPA has the annotation
+oc get dspa dspa -n data-strat-poc -o jsonpath='{.spec.apiServer}' | python3 -m json.tool
+```
+
+**Key gotcha:** The ConfigMap env injection and downward API injection can conflict if both try to set `OPENLINEAGE_NAMESPACE`. The downward API approach takes precedence and is more portable.
+
+### Step 10: MLflow (No Action Needed)
+
+MLflow is deployed cluster-wide by the RHOAI MLflow Operator. No per-namespace deployment is required.
+
+**Verification:**
+```bash
+# Check MLflow Operator status
+oc get mlflow -A
+
+# Check MLflow route
+oc get route mlflow-ui -n redhat-ods-applications
+```
+
+**Access from pipeline pods:** Requires SA token + `X-Mlflow-Workspace: data-strat-poc` header. See [MLflow integration](../technical/mlflow-integration.md) for details. Note: this is currently a known limitation (PG-024).
+
+---
 
 ## Known Issues
 

@@ -2,7 +2,7 @@
 
 Everything needed before deploying any component of this project.
 
-**Last Updated:** 2026-05-25 (M1 complete — specs updated with actual measurements)
+**Last Updated:** 2026-05-25 (M2 complete — Marquez + MLflow added)
 
 ## Cluster Requirements
 
@@ -29,18 +29,20 @@ Everything needed before deploying any component of this project.
 | RHOAI Operator | 3.5+ | Platform foundation | OperatorHub |
 | KubeRay Operator | 1.1+ | Ray cluster management | Installed via RHOAI |
 | Milvus Operator | 2.4+ | Vector database (Certified Partner) | OperatorHub or Helm |
+| MLflow Operator | Part of RHOAI 3.4+ | Experiment tracking | Installed via RHOAI DSC |
 | GPU Operator | — | NVIDIA GPU support | OperatorHub |
 
 ## Storage
 
-| Storage | Size | Purpose | M1 Actual |
-|---------|------|---------|-----------|
+| Storage | Size | Purpose | Actual |
+|---------|------|---------|--------|
 | S3/MinIO (pipeline) | 5GB | Document staging, pipeline artifacts, JSONL chunks | 11 PDFs + JSONL output used <500MB. The Milvus Helm default creates a separate 500Gi MinIO (PG-017) — should be reduced. |
 | PVC: `data-pvc` (RWX) | 5Gi | Shared document corpus (input PDFs) | Bound; 11 PDFs stored |
 | PVC: `model-cache-pvc` (RWO) | 50Gi | Model weights cache (Mistral 7B for M4) | Bound; LLM weights cached but not needed for M1 ingest |
 | Milvus storage | <1Gi | Vector storage for document corpus | 312 vectors (11 PDFs) is minimal; grows with corpus size |
 | MariaDB (DSPA) | 10Gi | KFP pipeline metadata | Bound; used by DSPA for run history |
-| PostgreSQL | 5GB | Marquez backend, MLflow backend (M2+) | Not yet deployed |
+| PostgreSQL (Marquez) | 2Gi | Marquez lineage metadata store | M2: Deployed. Stores jobs, datasets, runs, facets. |
+| MLflow (storage) | Managed by Operator | Experiment tracking backend | M2: Deployed cluster-wide by RHOAI MLflow Operator. No per-namespace PVC. |
 
 ## Network
 

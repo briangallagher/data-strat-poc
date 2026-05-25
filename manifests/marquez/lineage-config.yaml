@@ -1,0 +1,23 @@
+# Lineage configuration ConfigMap
+# Central config for all lineage-related settings in the namespace
+# Feature flag: MLFLOW_BRIDGE_ENABLED controls whether MLflow emits to Marquez
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-strat-lineage-config
+  namespace: data-strat-poc
+data:
+  # Marquez / OpenLineage
+  # NOTE: OPENLINEAGE_NAMESPACE is NOT set here -- it's injected by the DSP
+  # workflow controller patch via downward API (metadata.namespace).
+  # Setting it here would conflict.
+  OPENLINEAGE_URL: "http://marquez:5000"
+
+  # MLflow
+  MLFLOW_EXPERIMENT_NAME: "data-strat-ingest"
+
+  # Feature flag: MLflow-Marquez bridge
+  # "false" (default): MLflow tracks experiments only, Marquez gets OL events from pipeline components
+  # "true": MLflow also emits OL events to Marquez via tracking store adapter (richer graph, potentially noisier)
+  MLFLOW_BRIDGE_ENABLED: "false"

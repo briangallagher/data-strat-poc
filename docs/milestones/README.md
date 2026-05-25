@@ -7,8 +7,8 @@ Execution plan for the Data Strategy POC v2. Each milestone builds incrementally
 | Milestone | Status | Summary | Dates |
 |-----------|--------|---------|-------|
 | [M0: Foundation](M0-foundation/) | **Complete** | Documentation structure, ADRs, tooling, M1 plan | May 22-23 |
-| [M1: Ingest Pipeline](M1-ingest-pipeline/) | **Active** (Phase 3 complete) | RayData + Docling + KFP + Milvus with Scenario B metadata | May 23-25 |
-| [M2: MLflow](M2-mlflow/) | Planned | Experiment tracking + lineage instrumentation | — |
+| [M1: Ingest Pipeline](M1-ingest-pipeline/) | **Complete** | RayData + Docling + KFP + Milvus with Scenario B metadata | May 23-25 |
+| [M2: MLflow + Lineage](M2-mlflow/) | **Complete** | rhoai-lineage library, Marquez, MLflow, OL emission, E2E lineage graph | May 25 |
 | [M3: Connectors](M3-connectors/) | Planned | Data source acquisition layer | — |
 | [M4: Query](M4-query/) | Planned | OGX Responses API + deterministic RAG | — |
 | [M5: Agentic + Hardening](M5-agentic-hardening/) | Planned | Multi-hop retrieval, RBAC, production gap closure | — |
@@ -24,10 +24,22 @@ M1 follows a three-phase approach: validate Saad's baseline first, then adapt fo
 | Phase 2: Scale Up | **Complete** | 11 PDFs (12MB corpus including 6.9MB FEMA manual), 312 vectors, ~7 min e2e. Idempotency verified. | All documents processed without failure. Deterministic chunking confirmed (same counts on re-run). |
 | Phase 3: Pipeline Split | **Complete** | Data-chain-only `rag_ingest_pipeline` created and verified. Removes model deployment steps ([DEC-007](../decisions.md)). | Cleaner pipeline for M1–M3 — fewer params, no GPU needs, faster runs. Full pipeline retained for M4+. |
 
+## M2 Progress Detail
+
+M2 adds pipeline observability and data lineage via `rhoai-lineage` library, Marquez, and MLflow.
+
+| Phase | Status | What Was Done | Key Findings |
+|-------|--------|---------------|--------------|
+| Phase 0: Seed rhoai-lineage | **Complete** | Forked ET team's openlineage-oai + sdk into standalone package. Naming helpers, Marquez client, bridge support. | Clean separation from ET concerns; installable via git URL. |
+| Phase 1: Deploy Marquez + infra | **Complete** | PostgreSQL + Marquez API + Web UI deployed. DSP namespace injection via downward API. | fsGroup needed for PG PVC; MARQUEZ_CONFIG env var required (not inline); WEB_PORT not PORT for Web UI. |
+| Phase 2: Deploy MLflow + config | **Complete** | MLflow already available via RHOAI Operator. ConfigMap centralises lineage config. Bridge OFF by default. | MLflow tracking from KFP pods needs SA token + workspace header (PG-024). |
+| Phase 3: Add OL emission | **Complete** | parse_and_chunk and ingest_to_milvus emit START/COMPLETE events. Pipeline run SUCCEEDED. | Full lineage graph verified: PVC → parse → S3 → ingest → Milvus. Custom facets present. |
+| Phase 4: E2E verification + docs | **Complete** | ADR-004, technical deep dives, user journey, production gaps documented. All repos tagged. | MLflow tracking not working (PG-024). pipeline_run_id not in Marquez facets (PG-025). 5 new PGs added. |
+
 ## Principles
 
 - **Verify Before You Advance** — no milestone signs off without E2E verification at two scales
-- **Production-Grade from Day One** — deviations tracked in [production-gaps.md](../production-gaps.md) (20 gaps, 2 mitigated)
+- **Production-Grade from Day One** — deviations tracked in [production-gaps.md](../production-gaps.md) (25 gaps, 2 mitigated)
 - **Document as You Go** — each milestone produces ADRs, technical deep dives, and runbooks alongside the code
 - **Pause/Resume Friendly** — each checkpoint has enough context for a cold start
 
@@ -47,6 +59,7 @@ The plan is written before building starts. The checkpoint is written after veri
 |-----|----------|-----------|
 | [ADR-002](../architecture/adrs/ADR-002-chunking-milvus-schema.md) | HNSW index, 10-field schema with lineage + P&C metadata | M1 |
 | [ADR-003](../architecture/adrs/ADR-003-ogx-role.md) | Direct Milvus writes for ingest; OGX reserved for query (M4) | M0 |
+| [ADR-004](../architecture/adrs/ADR-004-lineage-architecture.md) | Fork-and-adapt rhoai-lineage; bridge OFF by default; operator deferred | M2 |
 | [ADR-007](../architecture/adrs/ADR-007-multi-repo-strategy.md) | Start in integration hub; extract when interfaces stabilise | M0 |
 
 ## Where Things Live
@@ -54,9 +67,14 @@ The plan is written before building starts. The checkpoint is written after veri
 | Artifact | Location |
 |----------|----------|
 | Pipeline component code (with fixes) | [briangallagher/pipelines-components:data-strat-poc](https://github.com/briangallagher/pipelines-components/tree/data-strat-poc) |
+| rhoai-lineage library | [briangallagher/rhoai-lineage](https://github.com/briangallagher/rhoai-lineage) (`~/dev/git-repos/rhoai-lineage`) |
 | Compiled pipeline YAML (ingest only, M1–M3) | `rag_ingest_pipeline.yaml` (repo root) |
 | Compiled pipeline YAML (full, M4+) | `rag_multistep_pipeline.yaml` (repo root) |
 | Infrastructure manifests | `manifests/` |
+| Marquez manifests | `manifests/marquez/` |
 | Production gaps | [production-gaps.md](../production-gaps.md) |
 | Prior art synthesis | [prior-art-synthesis.md](../working/prior-art-synthesis.md) |
 | Phase 0 lessons learned | [m1-phase0-lessons-learned.md](../working/m1-phase0-lessons-learned.md) |
+| Marquez Web UI | https://marquez-web-data-strat-poc.apps.dev.aip-ft.rh-ods.com |
+| Marquez API | https://marquez-data-strat-poc.apps.dev.aip-ft.rh-ods.com |
+| MLflow UI | https://mlflow-ui-redhat-ods-applications.apps.dev.aip-ft.rh-ods.com |
