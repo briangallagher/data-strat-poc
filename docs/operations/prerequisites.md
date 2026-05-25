@@ -2,26 +2,25 @@
 
 Everything needed before deploying any component of this project.
 
-**Last Updated:** 2026-05-22 (M0 — initial draft, concrete specs to be filled during M0 execution)
+**Last Updated:** 2026-05-25 (M1 complete — specs updated with actual measurements)
 
 ## Cluster Requirements
 
 | Requirement | Specification | Notes |
 |-------------|--------------|-------|
-| OpenShift | 4.14+ | Required for RHOAI 3.5+ |
-| RHOAI | 3.5+ | Provides KFP, model serving, workbench infrastructure |
+| OpenShift | 4.14+ | Required for RHOAI 3.4+ |
+| RHOAI | 3.4+ | Provides KFP, model serving, workbench infrastructure. M1 verified on 3.4. vLLM `--task=embedding` requires 3.5+ (PG-018). |
 | Cluster access | `cluster-admin` or namespace-scoped admin | For operator installation and CRD creation |
 | CLI tools | `oc`, `helm`, `kubectl`, `kfp` | `oc` for OpenShift, `helm` for Milvus, `kfp` for pipeline compilation |
 
 ## GPU / Compute Resources
 
-| Resource | Specification | Purpose |
-|----------|--------------|---------|
-| GPU | 1x NVIDIA L40S, A100, or H100 (minimum 24GB VRAM) | Model serving (embedding + LLM inference) |
-| CPU workers | 4+ vCPU, 16GB RAM (per Ray worker) | RayData + Docling document processing |
-| Head node | 2 vCPU, 8GB RAM | Ray head node |
-
-<!-- TODO: Refine based on M1 actual measurements -->
+| Resource | Specification | Purpose | M1 Actual |
+|----------|--------------|---------|-----------|
+| GPU | 1x NVIDIA L40S, A100, or H100 (24GB+ VRAM) | Model serving — embedding + LLM inference (M4) | **Not needed for M1** — local sentence-transformers runs on CPU. GPU required from M4 (query path with vLLM). |
+| CPU workers | 4 vCPU, 8GB RAM (per Ray worker) | RayData + Docling document processing | Verified: 2 workers × 4 CPU / 8GB processed 11 PDFs in ~4–5 min |
+| Head node | 2 vCPU, 8GB RAM | Ray head node | Verified: default head config sufficient |
+| Embedding (in-pod) | ~2 vCPU, 4GB RAM (within ingest_to_milvus pod) | Local Granite Embedding 125M (~500MB model download) | Verified: CPU embedding of 312 chunks completed in ~2 min |
 
 ## Operators
 
@@ -34,14 +33,14 @@ Everything needed before deploying any component of this project.
 
 ## Storage
 
-| Storage | Size | Purpose |
-|---------|------|---------|
-| S3/MinIO | 10GB+ | Document staging, pipeline artifacts, model cache |
-| PVC (RWX) | 5GB+ | Shared document corpus |
-| PVC (RWO) | 20GB+ | Model weights cache |
-| PostgreSQL | 5GB | Marquez backend, MLflow backend |
-
-<!-- TODO: Refine storage sizes based on M1 corpus measurements -->
+| Storage | Size | Purpose | M1 Actual |
+|---------|------|---------|-----------|
+| S3/MinIO (pipeline) | 5GB | Document staging, pipeline artifacts, JSONL chunks | 11 PDFs + JSONL output used <500MB. The Milvus Helm default creates a separate 500Gi MinIO (PG-017) — should be reduced. |
+| PVC: `data-pvc` (RWX) | 5Gi | Shared document corpus (input PDFs) | Bound; 11 PDFs stored |
+| PVC: `model-cache-pvc` (RWO) | 50Gi | Model weights cache (Mistral 7B for M4) | Bound; LLM weights cached but not needed for M1 ingest |
+| Milvus storage | <1Gi | Vector storage for document corpus | 312 vectors (11 PDFs) is minimal; grows with corpus size |
+| MariaDB (DSPA) | 10Gi | KFP pipeline metadata | Bound; used by DSPA for run history |
+| PostgreSQL | 5GB | Marquez backend, MLflow backend (M2+) | Not yet deployed |
 
 ## Network
 

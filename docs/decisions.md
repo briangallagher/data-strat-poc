@@ -77,3 +77,14 @@ High-level decisions made during the project. For significant architectural deci
 **Decision:** All OpenShift namespaces created by this project must be prefixed with `data-strat-`. The primary namespace is `data-strat-poc`. Additional namespaces (if needed for isolation) follow the pattern `data-strat-<component>` (e.g. `data-strat-mlflow`, `data-strat-lineage`).
 
 **Consequences:** Easy identification of project resources at a glance. Simplifies cleanup (`oc get ns | grep data-strat-`). Consistent with the repo name. All manifests, getting-started docs, runbooks, and scripts must use this prefix — never hardcode a namespace without it.
+
+### DEC-006: Git tagging convention for milestones and phases
+**Date:** 2026-05-25
+**Milestone:** M1
+**Status:** Decided
+
+**Context:** The project spans multiple repos (`data-strat-poc` for docs/manifests and `pipelines-components` fork for component code). When a milestone or phase is verified, we need a way to recreate that exact state across all repos — for rollback, comparison, or onboarding.
+
+**Decision:** Use lightweight git tags with the pattern `m<N>-p<P>` (e.g., `m1-p0`, `m1-p2`, `m1-complete`) applied simultaneously to all project repos at each verified checkpoint. Tags are permanent and never moved.
+
+**Consequences:** Any checkpoint can be recreated by checking out the same tag across all repos. Enables rollback after broken changes. Makes it easy to diff between phases (`git diff m1-p1..m1-p2`). Requires discipline to tag all repos together — a missed tag on one repo breaks the contract.

@@ -447,6 +447,56 @@ All namespaces must be prefixed with `data-strat-` so project resources are imme
 
 When writing manifests, runbooks, getting-started docs, or scripts, always use the `data-strat-` prefix. Never hardcode a namespace without it.
 
+### Git Tags (DEC-006)
+
+All repos in this project use a consistent tagging convention to mark milestone and phase completions. Tags are applied to **all repos simultaneously** at each checkpoint so the full system state can be recreated.
+
+**Pattern:** `m<milestone>-p<phase>[-<qualifier>]`
+
+| Tag | Meaning | Example |
+|-----|---------|---------|
+| `m<N>-p<P>` | Milestone N, Phase P complete | `m1-p0`, `m1-p1`, `m1-p2` |
+| `m<N>-p<P>-<qualifier>` | With qualifier for special states | `m1-p0-baseline` |
+| `m<N>-complete` | Full milestone sign-off | `m1-complete` |
+
+**Rules:**
+- Tags are applied to **all project repos at the same time** — never tag one repo without tagging the others
+- A tag represents a **verified checkpoint** — the system was tested and working at this point
+- Tags are lightweight (not annotated) unless the milestone checkpoint warrants a release note
+- Never move or delete tags — they are permanent reference points
+
+**Repos that get tagged:**
+
+| Repo | What's Tagged |
+|------|---------------|
+| `data-strat-poc` | Docs, manifests, compiled pipeline YAML, scripts |
+| `briangallagher/pipelines-components` (branch `data-strat-poc`) | Pipeline component code with fixes |
+
+**To recreate a checkpoint:**
+
+```bash
+# Check out a specific milestone/phase across all repos
+git -C ~/dev/git-repos/data-strat-poc checkout m1-p2
+git -C ~/dev/odh/pipelines-components checkout m1-p2
+
+# Recompile the pipeline from that state
+pip install -e ~/dev/odh/pipelines-components  # or /tmp clone
+python3 -c "from kfp import compiler; ..."
+
+# Redeploy using the manifests from that tag
+oc apply -f manifests/base/namespace-setup.yaml
+# ... etc (see getting-started.md)
+```
+
+**To fall back after a broken change:**
+
+```bash
+# Revert both repos to the last known-good checkpoint
+git -C ~/dev/git-repos/data-strat-poc checkout m1-p1
+git -C ~/dev/odh/pipelines-components checkout m1-p1
+# Recompile and redeploy from that state
+```
+
 ## Quality Checklist
 
 Run before finalising any document:

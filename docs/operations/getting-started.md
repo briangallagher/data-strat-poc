@@ -2,21 +2,23 @@
 
 Step-by-step guide to deploy the system from scratch. Start here after confirming all [prerequisites](prerequisites.md).
 
-**Last Updated:** 2026-05-23 (M1 Phase 0 — verified deployment sequence)
+**Last Updated:** 2026-05-25 (M1 complete — verified through Phase 2, 11 PDFs, 312 vectors)
 
 ## Deployment Order
 
 Components must be deployed in this order due to dependencies:
 
 ```
-1. Namespace + Secrets + PVCs  (base)
-2. MinIO                       (needed by DSPA and pipeline)
-3. MinIO buckets               (needed by DSPA)
-4. DSPA                        (needs MinIO)
-5. Milvus                      (independent, but needed before pipeline runs)
-6. RBAC                        (needs DSPA service account to exist)
-7. Upload test data            (needs data-pvc)
-8. Compile + upload pipeline   (needs DSPA)
+1. Namespace + Secrets + PVCs   (base)
+2. MinIO                        (needed by DSPA and pipeline)
+3. MinIO buckets                (needed by DSPA)
+4. DSPA                         (needs MinIO)
+5. Milvus                       (independent, but needed before pipeline runs)
+6. RBAC                         (needs DSPA service account to exist)
+7. Upload test data             (needs data-pvc)
+8. Milvus collection setup      (auto-created by pipeline; embedding via local model)
+9. Compile + upload pipeline    (needs DSPA + pipelines-components fork)
+10. Run pipeline                (see runbook)
 ```
 
 ## Step 1: Create Namespace and Base Resources
@@ -109,11 +111,22 @@ oc exec data-loader -n data-strat-poc -- ls -la /mnt/data/input/pdfs/
 oc delete pod data-loader -n data-strat-poc
 ```
 
-## Step 8: Compile and Run Pipeline
+## Step 8: Deploy Milvus Collection (M1)
+
+Milvus is deployed in Step 5 via Helm. The collection schema and HNSW index are created automatically by the `ingest_to_milvus` pipeline component on first run (or on every run with `drop_existing=true`). No manual collection creation is needed.
+
+**Embedding model:** M1 uses local `sentence-transformers` (Granite Embedding 125M, 768-dim) running inside the `ingest_to_milvus` KFP pod. No separate embedding InferenceService is needed — RHOAI 3.4's vLLM lacks `--task=embedding` support (PG-018). The model (~500MB) downloads from HuggingFace on each run (PG-019).
+
+## Step 9: Compile and Upload Pipeline
 
 ```bash
-# Install pipelines-components (from fork with auth fixes)
-pip install -e /path/to/pipelines-components
+# Clone the fork (use /tmp to avoid file watcher issue)
+rm -rf /tmp/pipelines-components
+git clone --branch data-strat-poc \
+  https://github.com/briangallagher/pipelines-components.git \
+  /tmp/pipelines-components
+
+pip install -e /tmp/pipelines-components
 
 # Compile
 python3 -c "
@@ -131,7 +144,9 @@ curl -sk "$DSP_HOST/apis/v2beta1/pipelines/upload" \
   -F "uploadfile=@rag_multistep_pipeline.yaml;type=application/x-yaml"
 ```
 
-See `docs/operations/runbooks/run-ingest-pipeline.md` for creating a pipeline run with the correct parameters.
+## Step 10: Run the Pipeline
+
+See [runbooks/run-ingest-pipeline.md](runbooks/run-ingest-pipeline.md) for full step-by-step instructions on creating a pipeline run with the correct parameters, monitoring progress, and verifying results.
 
 ## Health Verification
 
@@ -155,6 +170,78 @@ oc get routes -n data-strat-poc
 ```
 
 **Expected:** All pods Running, Milvus service on port 19530, DSPA ready, PVCs bound, DSP route available.
+
+## Tagging Checkpoints (DEC-006)
+
+After verifying a milestone phase, tag **all project repos** simultaneously so the state can be recreated.
+
+### Tagging
+
+```bash
+# After verifying a milestone phase, tag all repos with the same tag
+TAG="m1-p2"  # pattern: m<milestone>-p<phase>
+
+# Tag data-strat-poc
+git -C ~/dev/git-repos/data-strat-poc tag "$TAG"
+git -C ~/dev/git-repos/data-strat-poc push origin "$TAG"
+
+# Tag pipelines-components fork (data-strat-poc branch)
+git -C ~/dev/odh/pipelines-components tag "$TAG"
+git -C ~/dev/odh/pipelines-components push fork "$TAG"
+
+echo "Tagged all repos with $TAG"
+```
+
+For full milestone sign-off, also create a `m<N>-complete` tag.
+
+### Recreating a Checkpoint
+
+```bash
+# Check out a specific milestone/phase across all repos
+TAG="m1-p2"
+git -C ~/dev/git-repos/data-strat-poc checkout "$TAG"
+git -C ~/dev/odh/pipelines-components checkout "$TAG"
+
+# Recompile the pipeline from that state
+pip install -e ~/dev/odh/pipelines-components  # or /tmp clone if file watcher issue
+python3 -c "
+from kfp import compiler
+from kfp_components.pipelines.data_processing.ray_data.pdf_documents_processing_rag_pipeline.pipeline import rag_multistep_pipeline
+compiler.Compiler().compile(rag_multistep_pipeline, package_path='rag_multistep_pipeline.yaml')
+"
+
+# Redeploy infrastructure from that tag's manifests
+oc apply -f manifests/base/namespace-setup.yaml -n data-strat-poc
+# ... follow the deployment steps above
+```
+
+### Falling Back
+
+```bash
+# If a change breaks things, revert to the last known-good tag
+TAG="m1-p1"
+git -C ~/dev/git-repos/data-strat-poc checkout "$TAG"
+git -C ~/dev/odh/pipelines-components checkout "$TAG"
+# Recompile pipeline and redeploy
+```
+
+### Comparing Phases
+
+```bash
+# See what changed between phases
+git -C ~/dev/git-repos/data-strat-poc diff m1-p1..m1-p2
+git -C ~/dev/odh/pipelines-components diff m1-p1..m1-p2
+```
+
+### Current Tags
+
+| Tag | Date | Description |
+|-----|------|-------------|
+| `m0-complete` | 2026-05-25 | M0 documentation and planning complete |
+| `m1-p0` | 2026-05-25 | M1 Phase 0: Saad's baseline validated on cluster |
+| `m1-p1` | 2026-05-25 | M1 Phase 1: Scenario B metadata adaptations verified (small scale) |
+| `m1-p2` | 2026-05-25 | M1 Phase 2: Full corpus (11 PDFs, 312 vectors), idempotency verified |
+| `m1-complete` | 2026-05-25 | M1 milestone sign-off |
 
 ## Known Issues
 
