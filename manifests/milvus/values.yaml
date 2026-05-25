@@ -1,0 +1,31 @@
+# Milvus Helm values for data-strat-poc
+# Install: helm install milvus milvus/milvus -n data-strat-poc -f values.yaml
+# Repo: helm repo add milvus https://zilliztech.github.io/milvus-helm/
+#
+# Prerequisites:
+#   oc adm policy add-scc-to-user anyuid -z default -n data-strat-poc
+#   (PG-016: anyuid SCC required — evaluate Milvus Operator for production)
+
+cluster:
+  enabled: false
+
+etcd:
+  replicaCount: 1
+
+minio:
+  mode: standalone
+  replicas: 1
+  persistence:
+    size: 10Gi  # PG-017: reduced from 500Gi default
+
+pulsar:
+  enabled: false
+
+pulsarv3:
+  enabled: false
+
+standalone:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi

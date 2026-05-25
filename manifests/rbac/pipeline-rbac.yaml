@@ -1,0 +1,38 @@
+# RBAC for pipeline service account
+# Grants permissions for RayJob, KServe, and HardwareProfile operations
+# PG-015: should be automated as part of deployment
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pipeline-rayjob-manager
+  namespace: data-strat-poc
+rules:
+  - apiGroups: ["ray.io"]
+    resources: ["rayjobs", "rayclusters"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services", "configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["serving.kserve.io"]
+    resources: ["inferenceservices", "servingruntimes"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["serving.kserve.io"]
+    resources: ["clusterservingruntimes"]
+    verbs: ["get", "list"]
+  - apiGroups: ["infrastructure.opendatahub.io"]
+    resources: ["hardwareprofiles"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pipeline-rayjob-manager
+  namespace: data-strat-poc
+subjects:
+  - kind: ServiceAccount
+    name: pipeline-runner-dspa
+    namespace: data-strat-poc
+roleRef:
+  kind: Role
+  name: pipeline-rayjob-manager
+  apiGroup: rbac.authorization.k8s.io

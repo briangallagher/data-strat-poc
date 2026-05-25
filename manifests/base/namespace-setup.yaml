@@ -1,0 +1,56 @@
+# Base namespace setup for data-strat-poc
+# Run these before deploying any components
+#
+# 1. Create namespace:
+#    oc new-project data-strat-poc
+#
+# 2. Grant anyuid SCC for Milvus (PG-016):
+#    oc adm policy add-scc-to-user anyuid -z default -n data-strat-poc
+#
+# 3. Apply this file:
+#    oc apply -f manifests/base/namespace-setup.yaml -n data-strat-poc
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-secret
+  namespace: data-strat-poc
+type: Opaque
+stringData:
+  access_key: minio
+  secret_key: minio123
+---
+# HuggingFace token — replace 'your-token-here' with a real token
+# Get one at: https://huggingface.co/settings/tokens
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hf-token-secret
+  namespace: data-strat-poc
+type: Opaque
+stringData:
+  token: your-token-here
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-pvc
+  namespace: data-strat-poc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-cache-pvc
+  namespace: data-strat-poc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi

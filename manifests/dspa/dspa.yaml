@@ -1,0 +1,22 @@
+# Data Science Pipelines Application (KFP v2)
+# Requires: minio-service deployed + minio-secret created
+apiVersion: datasciencepipelinesapplications.opendatahub.io/v1
+kind: DataSciencePipelinesApplication
+metadata:
+  name: dspa
+  namespace: data-strat-poc
+spec:
+  dspVersion: v2
+  apiServer:
+    enableSamplePipeline: false
+  objectStorage:
+    externalStorage:
+      host: minio-service.data-strat-poc.svc.cluster.local
+      port: "9000"
+      scheme: http
+      bucket: pipeline-artifacts
+      region: us-east-1
+      s3CredentialsSecret:
+        accessKey: access_key
+        secretKey: secret_key
+        secretName: minio-secret
