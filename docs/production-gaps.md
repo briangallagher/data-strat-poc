@@ -72,7 +72,7 @@ Issues with document source acquisition and connectivity.
 |----|-----|---------------|---------------------|---------------|--------|
 | PG-005 | No document version tracking | v1 tracked dates in schema but never exercised | Automated staleness detection when docs are superseded | Version tracking in connector + Milvus metadata | Open |
 | PG-010 | Mock connectors only | v1 built mock Confluence/SharePoint; real connectors need OAuth, pagination | Production connectors with OAuth2, incremental sync | Build real connectors or adopt dlt | Open |
-| PG-020 | Pipeline-level metadata only (no per-document) | All docs in a run get same LOB/doc_type/effective_date from pipeline params | Per-document metadata from manifest file keyed by filename | Read manifest in parse_and_chunk instead of env vars. See ADR-002. | Open |
+| PG-020 | Pipeline-level metadata only (no per-document) | All docs in a run get same category/subcategory/document_date from pipeline params | Per-document metadata from manifest file keyed by filename | Read manifest in parse_and_chunk instead of env vars. See ADR-002. | Open |
 
 ## Security / Platform
 

@@ -8,9 +8,9 @@
 #    collection_name: str [Default: 'rag_documents']
 #    cpus_per_actor: int [Default: 4.0]
 #    deploy_embedding: bool [Default: False]
-#    doc_effective_date: str [Default: '']
-#    doc_lob: str [Default: '']
-#    doc_type: str [Default: '']
+#    doc_category: str [Default: '']
+#    doc_date: str [Default: '']
+#    doc_subcategory: str [Default: '']
 #    drop_existing: bool [Default: True]
 #    embed_batch_size: int [Default: 64.0]
 #    embedding_cpu_limits: str [Default: '4']
@@ -31,6 +31,7 @@
 #    head_cpus: int [Default: 2.0]
 #    head_memory_gb: int [Default: 8.0]
 #    hf_secret_name: str [Default: 'hf-token-secret']
+#    index_type: str [Default: 'HNSW']
 #    input_path: str [Default: 'input/pdfs']
 #    llm_cpu_limits: str [Default: '2']
 #    llm_cpu_requests: str [Default: '2']
@@ -125,6 +126,8 @@ components:
                   producerTask: deploy-embedding-model
               embedding_model:
                 componentInputParameter: pipelinechannel--embedding_model
+              index_type:
+                componentInputParameter: pipelinechannel--index_type
               milvus_batch_size:
                 componentInputParameter: pipelinechannel--milvus_batch_size
               milvus_db:
@@ -179,6 +182,8 @@ components:
           parameterType: STRING
         pipelinechannel--embedding_serving_runtime_name:
           parameterType: STRING
+        pipelinechannel--index_type:
+          parameterType: STRING
         pipelinechannel--milvus_batch_size:
           parameterType: NUMBER_INTEGER
         pipelinechannel--milvus_db:
@@ -222,6 +227,8 @@ components:
                 componentInputParameter: pipelinechannel--embedding_endpoint
               embedding_model:
                 componentInputParameter: pipelinechannel--embedding_model
+              index_type:
+                componentInputParameter: pipelinechannel--index_type
               milvus_batch_size:
                 componentInputParameter: pipelinechannel--milvus_batch_size
               milvus_db:
@@ -257,6 +264,8 @@ components:
         pipelinechannel--embedding_endpoint:
           parameterType: STRING
         pipelinechannel--embedding_model:
+          parameterType: STRING
+        pipelinechannel--index_type:
           parameterType: STRING
         pipelinechannel--milvus_batch_size:
           parameterType: NUMBER_INTEGER
@@ -318,6 +327,8 @@ components:
                 componentInputParameter: pipelinechannel--embedding_runtime_image
               pipelinechannel--embedding_serving_runtime_name:
                 componentInputParameter: pipelinechannel--embedding_serving_runtime_name
+              pipelinechannel--index_type:
+                componentInputParameter: pipelinechannel--index_type
               pipelinechannel--milvus_batch_size:
                 componentInputParameter: pipelinechannel--milvus_batch_size
               pipelinechannel--milvus_db:
@@ -364,6 +375,8 @@ components:
                 componentInputParameter: pipelinechannel--embedding_endpoint
               pipelinechannel--embedding_model:
                 componentInputParameter: pipelinechannel--embedding_model
+              pipelinechannel--index_type:
+                componentInputParameter: pipelinechannel--index_type
               pipelinechannel--milvus_batch_size:
                 componentInputParameter: pipelinechannel--milvus_batch_size
               pipelinechannel--milvus_db:
@@ -424,6 +437,8 @@ components:
         pipelinechannel--embedding_runtime_image:
           parameterType: STRING
         pipelinechannel--embedding_serving_runtime_name:
+          parameterType: STRING
+        pipelinechannel--index_type:
           parameterType: STRING
         pipelinechannel--milvus_batch_size:
           parameterType: NUMBER_INTEGER
@@ -567,6 +582,10 @@ components:
           description: Embedding model name (for API or local).
           isOptional: true
           parameterType: STRING
+        index_type:
+          defaultValue: HNSW
+          isOptional: true
+          parameterType: STRING
         milvus_batch_size:
           defaultValue: 256.0
           description: Batch size for Milvus inserts.
@@ -645,6 +664,10 @@ components:
         embedding_model:
           defaultValue: ibm-granite/granite-embedding-125m-english
           description: Embedding model name (for API or local).
+          isOptional: true
+          parameterType: STRING
+        index_type:
+          defaultValue: HNSW
           isOptional: true
           parameterType: STRING
         milvus_batch_size:
@@ -796,15 +819,15 @@ components:
           description: CPUs per Docling processing actor.
           isOptional: true
           parameterType: NUMBER_INTEGER
-        doc_effective_date:
+        doc_category:
           defaultValue: ''
           isOptional: true
           parameterType: STRING
-        doc_lob:
+        doc_date:
           defaultValue: ''
           isOptional: true
           parameterType: STRING
-        doc_type:
+        doc_subcategory:
           defaultValue: ''
           isOptional: true
           parameterType: STRING
@@ -1133,12 +1156,12 @@ deploymentSpec:
           \ str = \"default\",\n    milvus_token: str = \"\",\n    collection_name:\
           \ str = \"rag_documents\",\n    drop_existing: bool = True,\n    embed_batch_size:\
           \ int = 64,\n    milvus_batch_size: int = 256,\n    pipeline_run_id: str\
-          \ = \"\",\n) -> str:\n    \"\"\"Read chunks from S3, embed, and insert into\
-          \ Milvus.\n\n    Args:\n        s3_endpoint: S3-compatible endpoint URL\
-          \ (e.g. MinIO).\n        s3_bucket: S3 bucket containing chunk files.\n\
-          \        milvus_host: Milvus service hostname.\n        s3_prefix: Key prefix\
-          \ for chunk files in S3.\n        embedding_endpoint: Optional embedding\
-          \ service URL. If empty,\n            uses a local sentence-transformers\
+          \ = \"\",\n    index_type: str = \"HNSW\",\n) -> str:\n    \"\"\"Read chunks\
+          \ from S3, embed, and insert into Milvus.\n\n    Args:\n        s3_endpoint:\
+          \ S3-compatible endpoint URL (e.g. MinIO).\n        s3_bucket: S3 bucket\
+          \ containing chunk files.\n        milvus_host: Milvus service hostname.\n\
+          \        s3_prefix: Key prefix for chunk files in S3.\n        embedding_endpoint:\
+          \ Optional embedding service URL. If empty,\n            uses a local sentence-transformers\
           \ model.\n        embedding_model: Embedding model name (for API or local).\n\
           \        embedding_dim: Dimension of the embedding vectors.\n        milvus_port:\
           \ Milvus gRPC port.\n        milvus_db: Milvus database name.\n        milvus_token:\
@@ -1186,30 +1209,36 @@ deploymentSpec:
           pipeline_run_id\", dtype=DataType.VARCHAR, max_length=64),\n           \
           \     FieldSchema(name=\"chunk_index\", dtype=DataType.INT64),\n       \
           \         FieldSchema(name=\"text\", dtype=DataType.VARCHAR, max_length=32768),\n\
-          \                FieldSchema(name=\"lob\", dtype=DataType.VARCHAR, max_length=128),\n\
-          \                FieldSchema(name=\"doc_type\", dtype=DataType.VARCHAR,\
-          \ max_length=128),\n                FieldSchema(name=\"effective_date\"\
-          , dtype=DataType.VARCHAR, max_length=32),\n                FieldSchema(\n\
+          \                FieldSchema(name=\"category\", dtype=DataType.VARCHAR,\
+          \ max_length=128),\n                FieldSchema(name=\"subcategory\", dtype=DataType.VARCHAR,\
+          \ max_length=128),\n                FieldSchema(name=\"document_date\",\
+          \ dtype=DataType.VARCHAR, max_length=32),\n                FieldSchema(\n\
           \                    name=\"embedding\",\n                    dtype=DataType.FLOAT_VECTOR,\n\
           \                    dim=embedding_dim,\n                ),\n          \
-          \  ],\n            description=\"Scenario B: P&C document chunks with lineage\
+          \  ],\n            description=\"RAG document chunks with traceability and\
           \ metadata\",\n        )\n        client.create_collection(collection_name=collection_name,\
           \ schema=schema)\n\n        index_params = client.prepare_index_params()\n\
-          \        index_params.add_index(\n            field_name=\"embedding\",\n\
-          \            index_type=\"HNSW\",\n            metric_type=\"COSINE\",\n\
-          \            params={\"M\": 16, \"efConstruction\": 256},\n        )\n \
-          \       client.create_index(collection_name=collection_name, index_params=index_params)\n\
+          \        if index_type == \"HNSW\":\n            index_params.add_index(\n\
+          \                field_name=\"embedding\",\n                index_type=\"\
+          HNSW\",\n                metric_type=\"COSINE\",\n                params={\"\
+          M\": 16, \"efConstruction\": 256},\n            )\n        elif index_type\
+          \ == \"IVF_FLAT\":\n            index_params.add_index(\n              \
+          \  field_name=\"embedding\",\n                index_type=\"IVF_FLAT\",\n\
+          \                metric_type=\"COSINE\",\n                params={\"nlist\"\
+          : 128},\n            )\n        else:\n            raise ValueError(f\"\
+          Unsupported index_type: {index_type}. Use 'HNSW' or 'IVF_FLAT'.\")\n   \
+          \     client.create_index(collection_name=collection_name, index_params=index_params)\n\
           \        print(f\"Collection '{collection_name}' created (dim={embedding_dim},\
-          \ HNSW index).\")\n\n    # --- Setup embedding ---\n    use_endpoint = bool(embedding_endpoint)\n\
-          \    local_model = None\n\n    if use_endpoint:\n        print(f\"Using\
-          \ embedding endpoint: {embedding_endpoint}\")\n    else:\n        print(f\"\
-          Using local embedding model: {embedding_model}\")\n        from sentence_transformers\
-          \ import SentenceTransformer\n\n        local_model = SentenceTransformer(embedding_model)\n\
-          \n    def _embed_and_insert(batch):\n        texts = [c[\"text\"] for c\
-          \ in batch]\n        if use_endpoint:\n            all_embeddings = []\n\
-          \            for j in range(0, len(texts), embed_batch_size):\n        \
-          \        embed_batch = texts[j : j + embed_batch_size]\n               \
-          \ resp = req_lib.post(\n                    f\"{embedding_endpoint}/v1/embeddings\"\
+          \ {index_type} index).\")\n\n    # --- Setup embedding ---\n    use_endpoint\
+          \ = bool(embedding_endpoint)\n    local_model = None\n\n    if use_endpoint:\n\
+          \        print(f\"Using embedding endpoint: {embedding_endpoint}\")\n  \
+          \  else:\n        print(f\"Using local embedding model: {embedding_model}\"\
+          )\n        from sentence_transformers import SentenceTransformer\n\n   \
+          \     local_model = SentenceTransformer(embedding_model)\n\n    def _embed_and_insert(batch):\n\
+          \        texts = [c[\"text\"] for c in batch]\n        if use_endpoint:\n\
+          \            all_embeddings = []\n            for j in range(0, len(texts),\
+          \ embed_batch_size):\n                embed_batch = texts[j : j + embed_batch_size]\n\
+          \                resp = req_lib.post(\n                    f\"{embedding_endpoint}/v1/embeddings\"\
           ,\n                    json={\"model\": embedding_model, \"input\": embed_batch},\n\
           \                    timeout=120,\n                )\n                resp.raise_for_status()\n\
           \                data = resp.json()[\"data\"]\n                data.sort(key=lambda\
@@ -1222,11 +1251,11 @@ deploymentSpec:
           source_file\"],\n                \"source_document_id\": c.get(\"source_document_id\"\
           , c[\"source_file\"]),\n                \"pipeline_run_id\": pipeline_run_id\
           \ or \"unknown\",\n                \"chunk_index\": c[\"chunk_index\"],\n\
-          \                \"text\": c[\"text\"],\n                \"lob\": c.get(\"\
-          lob\", \"\"),\n                \"doc_type\": c.get(\"doc_type\", \"\"),\n\
-          \                \"effective_date\": c.get(\"effective_date\", \"\"),\n\
-          \                \"embedding\": emb,\n            }\n            for c,\
-          \ emb in zip(batch, embeddings)\n        ]\n        client.insert(collection_name=collection_name,\
+          \                \"text\": c[\"text\"],\n                \"category\": c.get(\"\
+          category\", \"\"),\n                \"subcategory\": c.get(\"subcategory\"\
+          , \"\"),\n                \"document_date\": c.get(\"document_date\", \"\
+          \"),\n                \"embedding\": emb,\n            }\n            for\
+          \ c, emb in zip(batch, embeddings)\n        ]\n        client.insert(collection_name=collection_name,\
           \ data=data)\n        return len(data)\n\n    # --- Embed and insert in\
           \ streaming batches ---\n    start_time = time.time()\n    total_inserted\
           \ = 0\n    file_count = 0\n    batch = []\n    seen_files = set()\n\n  \
@@ -1281,12 +1310,12 @@ deploymentSpec:
           \ str = \"default\",\n    milvus_token: str = \"\",\n    collection_name:\
           \ str = \"rag_documents\",\n    drop_existing: bool = True,\n    embed_batch_size:\
           \ int = 64,\n    milvus_batch_size: int = 256,\n    pipeline_run_id: str\
-          \ = \"\",\n) -> str:\n    \"\"\"Read chunks from S3, embed, and insert into\
-          \ Milvus.\n\n    Args:\n        s3_endpoint: S3-compatible endpoint URL\
-          \ (e.g. MinIO).\n        s3_bucket: S3 bucket containing chunk files.\n\
-          \        milvus_host: Milvus service hostname.\n        s3_prefix: Key prefix\
-          \ for chunk files in S3.\n        embedding_endpoint: Optional embedding\
-          \ service URL. If empty,\n            uses a local sentence-transformers\
+          \ = \"\",\n    index_type: str = \"HNSW\",\n) -> str:\n    \"\"\"Read chunks\
+          \ from S3, embed, and insert into Milvus.\n\n    Args:\n        s3_endpoint:\
+          \ S3-compatible endpoint URL (e.g. MinIO).\n        s3_bucket: S3 bucket\
+          \ containing chunk files.\n        milvus_host: Milvus service hostname.\n\
+          \        s3_prefix: Key prefix for chunk files in S3.\n        embedding_endpoint:\
+          \ Optional embedding service URL. If empty,\n            uses a local sentence-transformers\
           \ model.\n        embedding_model: Embedding model name (for API or local).\n\
           \        embedding_dim: Dimension of the embedding vectors.\n        milvus_port:\
           \ Milvus gRPC port.\n        milvus_db: Milvus database name.\n        milvus_token:\
@@ -1334,30 +1363,36 @@ deploymentSpec:
           pipeline_run_id\", dtype=DataType.VARCHAR, max_length=64),\n           \
           \     FieldSchema(name=\"chunk_index\", dtype=DataType.INT64),\n       \
           \         FieldSchema(name=\"text\", dtype=DataType.VARCHAR, max_length=32768),\n\
-          \                FieldSchema(name=\"lob\", dtype=DataType.VARCHAR, max_length=128),\n\
-          \                FieldSchema(name=\"doc_type\", dtype=DataType.VARCHAR,\
-          \ max_length=128),\n                FieldSchema(name=\"effective_date\"\
-          , dtype=DataType.VARCHAR, max_length=32),\n                FieldSchema(\n\
+          \                FieldSchema(name=\"category\", dtype=DataType.VARCHAR,\
+          \ max_length=128),\n                FieldSchema(name=\"subcategory\", dtype=DataType.VARCHAR,\
+          \ max_length=128),\n                FieldSchema(name=\"document_date\",\
+          \ dtype=DataType.VARCHAR, max_length=32),\n                FieldSchema(\n\
           \                    name=\"embedding\",\n                    dtype=DataType.FLOAT_VECTOR,\n\
           \                    dim=embedding_dim,\n                ),\n          \
-          \  ],\n            description=\"Scenario B: P&C document chunks with lineage\
+          \  ],\n            description=\"RAG document chunks with traceability and\
           \ metadata\",\n        )\n        client.create_collection(collection_name=collection_name,\
           \ schema=schema)\n\n        index_params = client.prepare_index_params()\n\
-          \        index_params.add_index(\n            field_name=\"embedding\",\n\
-          \            index_type=\"HNSW\",\n            metric_type=\"COSINE\",\n\
-          \            params={\"M\": 16, \"efConstruction\": 256},\n        )\n \
-          \       client.create_index(collection_name=collection_name, index_params=index_params)\n\
+          \        if index_type == \"HNSW\":\n            index_params.add_index(\n\
+          \                field_name=\"embedding\",\n                index_type=\"\
+          HNSW\",\n                metric_type=\"COSINE\",\n                params={\"\
+          M\": 16, \"efConstruction\": 256},\n            )\n        elif index_type\
+          \ == \"IVF_FLAT\":\n            index_params.add_index(\n              \
+          \  field_name=\"embedding\",\n                index_type=\"IVF_FLAT\",\n\
+          \                metric_type=\"COSINE\",\n                params={\"nlist\"\
+          : 128},\n            )\n        else:\n            raise ValueError(f\"\
+          Unsupported index_type: {index_type}. Use 'HNSW' or 'IVF_FLAT'.\")\n   \
+          \     client.create_index(collection_name=collection_name, index_params=index_params)\n\
           \        print(f\"Collection '{collection_name}' created (dim={embedding_dim},\
-          \ HNSW index).\")\n\n    # --- Setup embedding ---\n    use_endpoint = bool(embedding_endpoint)\n\
-          \    local_model = None\n\n    if use_endpoint:\n        print(f\"Using\
-          \ embedding endpoint: {embedding_endpoint}\")\n    else:\n        print(f\"\
-          Using local embedding model: {embedding_model}\")\n        from sentence_transformers\
-          \ import SentenceTransformer\n\n        local_model = SentenceTransformer(embedding_model)\n\
-          \n    def _embed_and_insert(batch):\n        texts = [c[\"text\"] for c\
-          \ in batch]\n        if use_endpoint:\n            all_embeddings = []\n\
-          \            for j in range(0, len(texts), embed_batch_size):\n        \
-          \        embed_batch = texts[j : j + embed_batch_size]\n               \
-          \ resp = req_lib.post(\n                    f\"{embedding_endpoint}/v1/embeddings\"\
+          \ {index_type} index).\")\n\n    # --- Setup embedding ---\n    use_endpoint\
+          \ = bool(embedding_endpoint)\n    local_model = None\n\n    if use_endpoint:\n\
+          \        print(f\"Using embedding endpoint: {embedding_endpoint}\")\n  \
+          \  else:\n        print(f\"Using local embedding model: {embedding_model}\"\
+          )\n        from sentence_transformers import SentenceTransformer\n\n   \
+          \     local_model = SentenceTransformer(embedding_model)\n\n    def _embed_and_insert(batch):\n\
+          \        texts = [c[\"text\"] for c in batch]\n        if use_endpoint:\n\
+          \            all_embeddings = []\n            for j in range(0, len(texts),\
+          \ embed_batch_size):\n                embed_batch = texts[j : j + embed_batch_size]\n\
+          \                resp = req_lib.post(\n                    f\"{embedding_endpoint}/v1/embeddings\"\
           ,\n                    json={\"model\": embedding_model, \"input\": embed_batch},\n\
           \                    timeout=120,\n                )\n                resp.raise_for_status()\n\
           \                data = resp.json()[\"data\"]\n                data.sort(key=lambda\
@@ -1370,11 +1405,11 @@ deploymentSpec:
           source_file\"],\n                \"source_document_id\": c.get(\"source_document_id\"\
           , c[\"source_file\"]),\n                \"pipeline_run_id\": pipeline_run_id\
           \ or \"unknown\",\n                \"chunk_index\": c[\"chunk_index\"],\n\
-          \                \"text\": c[\"text\"],\n                \"lob\": c.get(\"\
-          lob\", \"\"),\n                \"doc_type\": c.get(\"doc_type\", \"\"),\n\
-          \                \"effective_date\": c.get(\"effective_date\", \"\"),\n\
-          \                \"embedding\": emb,\n            }\n            for c,\
-          \ emb in zip(batch, embeddings)\n        ]\n        client.insert(collection_name=collection_name,\
+          \                \"text\": c[\"text\"],\n                \"category\": c.get(\"\
+          category\", \"\"),\n                \"subcategory\": c.get(\"subcategory\"\
+          , \"\"),\n                \"document_date\": c.get(\"document_date\", \"\
+          \"),\n                \"embedding\": emb,\n            }\n            for\
+          \ c, emb in zip(batch, embeddings)\n        ]\n        client.insert(collection_name=collection_name,\
           \ data=data)\n        return len(data)\n\n    # --- Embed and insert in\
           \ streaming batches ---\n    start_time = time.time()\n    total_inserted\
           \ = 0\n    file_count = 0\n    batch = []\n    seen_files = set()\n\n  \
@@ -1623,7 +1658,7 @@ deploymentSpec:
           \ int = 2,\n    max_actors: int = 4,\n    batch_size: int = 4,\n    num_files:\
           \ int = 0,\n    timeout_seconds: int = 600,\n    enable_profiling: bool\
           \ = False,\n    verbose: bool = True,\n    bypass_kueue: bool = False,\n\
-          \    doc_lob: str = \"\",\n    doc_type: str = \"\",\n    doc_effective_date:\
+          \    doc_category: str = \"\",\n    doc_subcategory: str = \"\",\n    doc_date:\
           \ str = \"\",\n) -> str:\n    \"\"\"Parse PDFs and write chunked JSONL files\
           \ to S3.\n\n    Args:\n        pvc_name: Name of the PVC with input PDFs.\n\
           \        pvc_mount_path: Mount path for the PVC inside pods.\n        input_path:\
@@ -1756,20 +1791,20 @@ deploymentSpec:
           \                                \"source_file\": fname,\n             \
           \                   \"source_document_id\": doc_id,\n                  \
           \              \"chunk_index\": idx,\n                                \"\
-          text\": chunk.text,\n                                \"lob\": os.environ.get(\"\
-          DOC_LOB\", \"\"),\n                                \"doc_type\": os.environ.get(\"\
-          DOC_TYPE\", \"\"),\n                                \"effective_date\":\
-          \ os.environ.get(\"DOC_EFFECTIVE_DATE\", \"\"),\n                      \
-          \      }))\n                    if not lines:\n                        log_verbose(f\"\
-          [Worker {worker_pid}] {fname}: ALL CHUNKS EMPTY\")\n                   \
-          \     res_q.put((\"empty\", file_path, page_count, 0, \"All chunks empty\"\
-          ))\n                        continue\n\n                    log_verbose(f\"\
-          [Worker {worker_pid}] {fname}: {len(lines)} non-empty chunks\")\n      \
-          \              jsonl_body = \"\\\\n\".join(lines) + \"\\\\n\"\n        \
-          \            s3_key = f\"{s3_prefix}/{stem}.jsonl\"\n\n                \
-          \    t_s3_start = time.time()\n                    s3.put_object(\n    \
-          \                    Bucket=s3_bucket, Key=s3_key,\n                   \
-          \     Body=jsonl_body.encode(\"utf-8\"),\n                        ContentType=\"\
+          text\": chunk.text,\n                                \"category\": os.environ.get(\"\
+          DOC_CATEGORY\", \"\"),\n                                \"subcategory\"\
+          : os.environ.get(\"DOC_SUBCATEGORY\", \"\"),\n                         \
+          \       \"document_date\": os.environ.get(\"DOC_DATE\", \"\"),\n       \
+          \                     }))\n                    if not lines:\n         \
+          \               log_verbose(f\"[Worker {worker_pid}] {fname}: ALL CHUNKS\
+          \ EMPTY\")\n                        res_q.put((\"empty\", file_path, page_count,\
+          \ 0, \"All chunks empty\"))\n                        continue\n\n      \
+          \              log_verbose(f\"[Worker {worker_pid}] {fname}: {len(lines)}\
+          \ non-empty chunks\")\n                    jsonl_body = \"\\\\n\".join(lines)\
+          \ + \"\\\\n\"\n                    s3_key = f\"{s3_prefix}/{stem}.jsonl\"\
+          \n\n                    t_s3_start = time.time()\n                    s3.put_object(\n\
+          \                        Bucket=s3_bucket, Key=s3_key,\n               \
+          \         Body=jsonl_body.encode(\"utf-8\"),\n                        ContentType=\"\
           application/jsonl\",\n                    )\n                    t_s3 =\
           \ time.time() - t_s3_start\n\n                    t_total = time.time()\
           \ - t_start\n                    log_verbose(\n                        f\"\
@@ -2008,10 +2043,10 @@ deploymentSpec:
           : s3_bucket,\n                \"S3_PREFIX\": s3_prefix,\n              \
           \  \"ENABLE_PROFILING\": \"true\" if enable_profiling else \"false\",\n\
           \                \"VERBOSE\": \"true\" if verbose else \"false\",\n    \
-          \            \"DOC_LOB\": doc_lob,\n                \"DOC_TYPE\": doc_type,\n\
-          \                \"DOC_EFFECTIVE_DATE\": doc_effective_date,\n         \
-          \   },\n        ),\n        ttl_seconds_after_finished=300,\n    )\n\n \
-          \   custom_api = k8s_client.CustomObjectsApi(api_client)\n    rayjob_group\
+          \            \"DOC_CATEGORY\": doc_category,\n                \"DOC_SUBCATEGORY\"\
+          : doc_subcategory,\n                \"DOC_DATE\": doc_date,\n          \
+          \  },\n        ),\n        ttl_seconds_after_finished=300,\n    )\n\n  \
+          \  custom_api = k8s_client.CustomObjectsApi(api_client)\n    rayjob_group\
           \ = \"ray.io\"\n    rayjob_version = \"v1\"\n    rayjob_plural = \"rayjobs\"\
           \n\n    rayjob_cr = job._build_rayjob_cr()\n    custom_api.create_namespaced_custom_object(\n\
           \        group=rayjob_group,\n        version=rayjob_version,\n        namespace=namespace,\n\
@@ -2132,6 +2167,8 @@ root:
               componentInputParameter: embedding_runtime_image
             pipelinechannel--embedding_serving_runtime_name:
               componentInputParameter: embedding_serving_runtime_name
+            pipelinechannel--index_type:
+              componentInputParameter: index_type
             pipelinechannel--milvus_batch_size:
               componentInputParameter: milvus_batch_size
             pipelinechannel--milvus_db:
@@ -2226,12 +2263,12 @@ root:
               componentInputParameter: chunk_max_tokens
             cpus_per_actor:
               componentInputParameter: cpus_per_actor
-            doc_effective_date:
-              componentInputParameter: doc_effective_date
-            doc_lob:
-              componentInputParameter: doc_lob
-            doc_type:
-              componentInputParameter: doc_type
+            doc_category:
+              componentInputParameter: doc_category
+            doc_date:
+              componentInputParameter: doc_date
+            doc_subcategory:
+              componentInputParameter: doc_subcategory
             enable_profiling:
               componentInputParameter: enable_profiling
             head_cpus:
@@ -2308,15 +2345,15 @@ root:
         description: If True, deploy embedding model as InferenceService.
         isOptional: true
         parameterType: BOOLEAN
-      doc_effective_date:
+      doc_category:
         defaultValue: ''
         isOptional: true
         parameterType: STRING
-      doc_lob:
+      doc_date:
         defaultValue: ''
         isOptional: true
         parameterType: STRING
-      doc_type:
+      doc_subcategory:
         defaultValue: ''
         isOptional: true
         parameterType: STRING
@@ -2418,6 +2455,10 @@ root:
       hf_secret_name:
         defaultValue: hf-token-secret
         description: 'Kubernetes Secret with HuggingFace token (key: ''token'').'
+        isOptional: true
+        parameterType: STRING
+      index_type:
+        defaultValue: HNSW
         isOptional: true
         parameterType: STRING
       input_path:

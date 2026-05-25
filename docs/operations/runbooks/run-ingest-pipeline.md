@@ -3,6 +3,15 @@
 **Last Verified:** 2026-05-25 (M1 Phase 2 — 11 PDFs, 312 vectors)
 **Prerequisites:** [prerequisites.md](../prerequisites.md)
 
+## Pipeline Variants
+
+| Pipeline | File | Compiled YAML | When to Use |
+|----------|------|---------------|-------------|
+| **Ingest (data-chain-only)** | `ingest_pipeline.py` | `rag_ingest_pipeline.yaml` | M1–M3: parse, chunk, embed, store. No model deployment. |
+| **Full multi-step** | `pipeline.py` | `rag_multistep_pipeline.yaml` | M4+: adds LLM download + deployment for RAG inference. |
+
+This runbook uses the **data-chain-only ingest pipeline** (`rag_ingest_pipeline.yaml`). See [DEC-007](../../decisions.md#dec-007-data-chain-only-ingest-pipeline-for-m1m3) for the rationale behind the split.
+
 ## What This Does
 
 Compiles, uploads, and runs the KFP-orchestrated ingest pipeline that parses PDFs with RayData + Docling, generates embeddings with Granite Embedding 125M, and stores vectors in Milvus. This runbook covers a single end-to-end pipeline run from compilation to result verification.
@@ -42,13 +51,13 @@ pip install -e /tmp/pipelines-components
 ```bash
 python3 -c "
 from kfp import compiler
-from kfp_components.pipelines.data_processing.ray_data.pdf_documents_processing_rag_pipeline.pipeline import rag_multistep_pipeline
-compiler.Compiler().compile(rag_multistep_pipeline, package_path='rag_multistep_pipeline.yaml')
+from kfp_components.pipelines.data_processing.ray_data.pdf_documents_processing_rag_pipeline.ingest_pipeline import rag_ingest_pipeline
+compiler.Compiler().compile(rag_ingest_pipeline, package_path='rag_ingest_pipeline.yaml')
 print('Pipeline compiled successfully')
 "
 ```
 
-**Expected output:** `Pipeline compiled successfully` and a `rag_multistep_pipeline.yaml` file in the current directory.
+**Expected output:** `Pipeline compiled successfully` and a `rag_ingest_pipeline.yaml` file in the current directory.
 
 **If it fails:**
 - `ModuleNotFoundError` — re-run `pip install -e /tmp/pipelines-components`
@@ -62,7 +71,7 @@ DSP_HOST="https://$(oc get route ds-pipeline-dspa -n data-strat-poc -o jsonpath=
 
 curl -sk "$DSP_HOST/apis/v2beta1/pipelines/upload" \
   -H "Authorization: Bearer $TOKEN" \
-  -F "uploadfile=@rag_multistep_pipeline.yaml;type=application/x-yaml"
+  -F "uploadfile=@rag_ingest_pipeline.yaml;type=application/x-yaml"
 ```
 
 **Expected output:** JSON response with `pipeline_id` and `display_name`. Note the `pipeline_id` — you need it to create a run.

@@ -7,7 +7,7 @@ Execution plan for the Data Strategy POC v2. Each milestone builds incrementally
 | Milestone | Status | Summary | Dates |
 |-----------|--------|---------|-------|
 | [M0: Foundation](M0-foundation/) | **Complete** | Documentation structure, ADRs, tooling, M1 plan | May 22-23 |
-| [M1: Ingest Pipeline](M1-ingest-pipeline/) | **Active** (Phase 2 complete) | RayData + Docling + KFP + Milvus with Scenario B metadata | May 23-25 |
+| [M1: Ingest Pipeline](M1-ingest-pipeline/) | **Active** (Phase 3 complete) | RayData + Docling + KFP + Milvus with Scenario B metadata | May 23-25 |
 | [M2: MLflow](M2-mlflow/) | Planned | Experiment tracking + lineage instrumentation | — |
 | [M3: Connectors](M3-connectors/) | Planned | Data source acquisition layer | — |
 | [M4: Query](M4-query/) | Planned | OGX Responses API + deterministic RAG | — |
@@ -22,6 +22,7 @@ M1 follows a three-phase approach: validate Saad's baseline first, then adapt fo
 | Phase 0: Baseline | **Complete** | Ran Saad's pipeline as-is on our cluster | K8s auth broken in KFP pods (7 iterations to fix); codeflare SDK bypassed; `_VLLM_IMAGE` constant outside KFP scope; Milvus service name mismatch. See [lessons learned](../working/m1-phase0-lessons-learned.md). |
 | Phase 1: Scenario B | **Complete** | Added `pipeline_run_id`, `source_document_id`, LOB, doc_type, effective_date to Milvus schema. HNSW index. Metadata flows through RayJob env vars → JSONL → Milvus. | All metadata verified on vectors. Per-document metadata is pipeline-level only (PG-020). See [ADR-002](../architecture/adrs/ADR-002-chunking-milvus-schema.md). |
 | Phase 2: Scale Up | **Complete** | 11 PDFs (12MB corpus including 6.9MB FEMA manual), 312 vectors, ~7 min e2e. Idempotency verified. | All documents processed without failure. Deterministic chunking confirmed (same counts on re-run). |
+| Phase 3: Pipeline Split | **Complete** | Data-chain-only `rag_ingest_pipeline` created and verified. Removes model deployment steps ([DEC-007](../decisions.md)). | Cleaner pipeline for M1–M3 — fewer params, no GPU needs, faster runs. Full pipeline retained for M4+. |
 
 ## Principles
 
@@ -53,7 +54,8 @@ The plan is written before building starts. The checkpoint is written after veri
 | Artifact | Location |
 |----------|----------|
 | Pipeline component code (with fixes) | [briangallagher/pipelines-components:data-strat-poc](https://github.com/briangallagher/pipelines-components/tree/data-strat-poc) |
-| Compiled pipeline YAML | `rag_multistep_pipeline.yaml` (repo root) |
+| Compiled pipeline YAML (ingest only, M1–M3) | `rag_ingest_pipeline.yaml` (repo root) |
+| Compiled pipeline YAML (full, M4+) | `rag_multistep_pipeline.yaml` (repo root) |
 | Infrastructure manifests | `manifests/` |
 | Production gaps | [production-gaps.md](../production-gaps.md) |
 | Prior art synthesis | [prior-art-synthesis.md](../working/prior-art-synthesis.md) |

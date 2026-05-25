@@ -37,42 +37,58 @@ This is Saad's default chunking approach, unchanged. The chunking itself works w
 
 ### Milvus Collection Schema
 
+The schema uses **generic field names** so the pipeline is reusable across teams and domains. Each team maps their domain concepts to the generic fields.
+
 ```
-Collection: underwriting_guidelines (or iso_forms, regulatory_bulletins)
+Collection: <domain-specific name, e.g., underwriting_guidelines>
 
 Fields:
   id                  INT64       primary key, auto-generated
-  source_file         VARCHAR(512)  original filename (e.g., "ca-doi-bulletin-2024-7.pdf")
+  source_file         VARCHAR(512)  original filename
   source_document_id  VARCHAR(256)  stable document identifier (filename stem, lowercase, kebab-case)
   pipeline_run_id     VARCHAR(64)   UUID linking to the KFP pipeline run — enables lineage bridging
   chunk_index         INT64         position of chunk within the source document
   text                VARCHAR(32768) raw chunk text (for retrieval display and re-embedding)
-  lob                 VARCHAR(128)  line of business (e.g., "commercial_property", "workers_comp")
-  doc_type            VARCHAR(128)  document type (e.g., "regulatory_bulletin", "iso_form")
-  effective_date      VARCHAR(32)   document effective date (ISO 8601)
-  embedding           FLOAT_VECTOR(768)  dense vector from Granite Embedding 125M
+  category            VARCHAR(128)  primary classification (team defines the semantics)
+  subcategory         VARCHAR(128)  secondary classification
+  document_date       VARCHAR(32)   document-level date (ISO 8601)
+  embedding           FLOAT_VECTOR(768)  dense vector from embedding model
 ```
+
+**Field mapping examples by domain:**
+
+| Generic Field | P&C Insurance (Scenario B) | IT Knowledge Base | Legal |
+|---------------|---------------------------|-------------------|-------|
+| `category` | Line of business (commercial_property) | Department (engineering, sales) | Practice area (M&A, litigation) |
+| `subcategory` | Document type (regulatory_bulletin) | Content type (runbook, architecture) | Document class (contract, opinion) |
+| `document_date` | Regulatory effective date | Publish/review date | Execution date |
+
+The field names are intentionally neutral — the pipeline doesn't care what the categories mean. Teams assign semantics via pipeline parameters.
 
 ### Index
 
-**HNSW** (Hierarchical Navigable Small World) with:
-- `M=16` — connections per node (balances recall vs memory)
-- `efConstruction=256` — build-time quality (higher = better index, slower build)
-- `metric_type=COSINE` — cosine similarity (normalised embeddings)
+**Default: HNSW** (Hierarchical Navigable Small World), configurable via `index_type` pipeline parameter.
 
-Changed from Saad's IVF_FLAT. HNSW is better for our use case:
+| Index | When to Use | Config |
+|-------|------------|--------|
+| **HNSW** (default) | Collections under ~1M vectors, incremental ingest | `M=16, efConstruction=256, COSINE` |
+| **IVF_FLAT** | Large collections (1M+), batch-only ingest | `nlist=128, COSINE` |
+
+HNSW is the default because:
 - No training step required (IVF_FLAT needs `nlist` tuning based on data size)
-- Better recall at low latency for collections under 1M vectors
+- Better recall at low latency for small-medium collections
 - Supports incremental inserts without re-indexing (IVF_FLAT degrades with appends)
+
+Teams processing very large corpora can switch to IVF_FLAT via the `index_type` parameter.
 
 ### Metadata Flow
 
 ```
-Pipeline parameters (doc_lob, doc_type, doc_effective_date, pipeline_run_id)
+Pipeline parameters (doc_category, doc_subcategory, doc_date, pipeline_run_id)
     │
     ▼
 parse_and_chunk (RayJob env vars → Docling workers → JSONL output)
-    │  Each chunk: {source_file, source_document_id, chunk_index, text, lob, doc_type, effective_date}
+    │  Each chunk: {source_file, source_document_id, chunk_index, text, category, subcategory, document_date}
     ▼
 S3 (JSONL files per source document)
     │
@@ -85,13 +101,13 @@ Milvus collection
 
 ### Collection Naming
 
-Collections follow the Scenario B document type naming:
+Collection names are domain-specific — each team names them based on their content taxonomy. For Scenario B (P&C insurance):
 
-| Collection | Content | LOB Partitioning |
+| Collection | Content | Category Values |
 |------------|---------|-----------------|
-| `underwriting_guidelines` | Internal company underwriting guidelines | By LOB (commercial_property, workers_comp, etc.) |
-| `iso_forms` | ISO/ACORD standard forms | By form series |
-| `regulatory_bulletins` | State DOI bulletins, NAIC guidance | By jurisdiction |
+| `underwriting_guidelines` | Internal company underwriting guidelines | commercial_property, workers_comp, etc. |
+| `iso_forms` | ISO/ACORD standard forms | form series |
+| `regulatory_bulletins` | State DOI bulletins, NAIC guidance | jurisdiction |
 
 For M1, only `underwriting_guidelines` is created. Others are added when relevant documents are available.
 

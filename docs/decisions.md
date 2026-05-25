@@ -78,6 +78,21 @@ High-level decisions made during the project. For significant architectural deci
 
 **Consequences:** Easy identification of project resources at a glance. Simplifies cleanup (`oc get ns | grep data-strat-`). Consistent with the repo name. All manifests, getting-started docs, runbooks, and scripts must use this prefix — never hardcode a namespace without it.
 
+### DEC-007: Data-chain-only ingest pipeline for M1–M3
+**Date:** 2026-05-25
+**Milestone:** M1
+**Status:** Decided
+
+**Context:** The full `rag_multistep_pipeline` includes both a data chain (parse → ingest) and a model chain (download LLM → deploy). For M1–M3 the focus is on the data pipeline — parsing, chunking, embedding, and vector storage. Model deployment (LLM + optional embedding service) is only needed from M4 onward when the query layer lands. Running unnecessary model deployment steps wastes GPU resources and adds failure modes during early milestones.
+
+**Decision:** Split into two pipeline files in `pipelines-components`:
+- `ingest_pipeline.py` — data-chain-only: `parse_and_chunk` → `ingest_to_milvus`. No model deployment parameters, no If/Else branching for embedding deployment. Used for M1–M3.
+- `pipeline.py` — full multi-step pipeline with both chains. Retained for M4+ when LLM deployment is needed.
+
+Both pipelines are exported from the same package. The compiled YAML for the ingest pipeline is `rag_ingest_pipeline.yaml`.
+
+**Consequences:** Simpler pipeline for early milestones — fewer parameters, no GPU requirements, faster runs. The full pipeline remains available and tested. When M4 starts, the team switches back to `rag_multistep_pipeline` (or extends the ingest pipeline with query steps).
+
 ### DEC-006: Git tagging convention for milestones and phases
 **Date:** 2026-05-25
 **Milestone:** M1
