@@ -482,38 +482,72 @@ deploymentSpec:
           , {\n                    \"experiment_id\": self._experiment_id, \"run_name\"\
           : run_name,\n                })\n                self._run_id = result.get(\"\
           run\", {}).get(\"info\", {}).get(\"run_id\")\n                return self._run_id\n\
-          \n            def log_param(self, key, value):\n                if not self._run_id:\n\
-          \                    return\n                self._post(\"/api/2.0/mlflow/runs/log-parameter\"\
+          \n            def create_parent_run(self, run_name, tags=None):\n      \
+          \          \"\"\"Create a parent run (pipeline-level).\"\"\"\n         \
+          \       body = {\n                    \"experiment_id\": self._experiment_id,\n\
+          \                    \"run_name\": run_name,\n                }\n      \
+          \          if tags:\n                    body[\"tags\"] = [{\"key\": k,\
+          \ \"value\": str(v)} for k, v in tags.items()]\n                result =\
+          \ self._post(\"/api/2.0/mlflow/runs/create\", body)\n                return\
+          \ result.get(\"run\", {}).get(\"info\", {}).get(\"run_id\")\n\n        \
+          \    def create_nested_run(self, run_name, parent_run_id):\n           \
+          \     \"\"\"Create a nested run under a parent.\"\"\"\n                result\
+          \ = self._post(\"/api/2.0/mlflow/runs/create\", {\n                    \"\
+          experiment_id\": self._experiment_id,\n                    \"run_name\"\
+          : run_name,\n                    \"tags\": [\n                        {\"\
+          key\": \"mlflow.parentRunId\", \"value\": parent_run_id},\n            \
+          \        ],\n                })\n                self._run_id = result.get(\"\
+          run\", {}).get(\"info\", {}).get(\"run_id\")\n                return self._run_id\n\
+          \n            def find_run_by_name(self, run_name):\n                \"\"\
+          \"Find a run by name in the current experiment.\"\"\"\n                resp\
+          \ = req_lib.post(\n                    f\"{self._url}/api/2.0/mlflow/runs/search\"\
+          ,\n                    json={\n                        \"experiment_ids\"\
+          : [self._experiment_id],\n                        \"filter\": f\"tags.`mlflow.runName`\
+          \ = '{run_name}'\",\n                        \"max_results\": 1,\n     \
+          \               },\n                    headers=self._headers, verify=False,\
+          \ timeout=10,\n                )\n                if resp.ok:\n        \
+          \            runs = resp.json().get(\"runs\", [])\n                    if\
+          \ runs:\n                        return runs[0].get(\"info\", {}).get(\"\
+          run_id\")\n                return None\n\n            def log_param(self,\
+          \ key, value):\n                if not self._run_id:\n                 \
+          \   return\n                self._post(\"/api/2.0/mlflow/runs/log-parameter\"\
           , {\n                    \"run_id\": self._run_id, \"key\": key, \"value\"\
           : str(value),\n                })\n\n            def log_metric(self, key,\
           \ value):\n                if not self._run_id:\n                    return\n\
           \                self._post(\"/api/2.0/mlflow/runs/log-metric\", {\n   \
           \                 \"run_id\": self._run_id, \"key\": key, \"value\": float(value),\n\
           \                    \"timestamp\": int(time.time() * 1000),\n         \
-          \       })\n\n            def end_run(self, status=\"FINISHED\"):\n    \
-          \            if not self._run_id:\n                    return\n        \
-          \        self._post(\"/api/2.0/mlflow/runs/update\", {\n               \
-          \     \"run_id\": self._run_id, \"status\": status,\n                  \
-          \  \"end_time\": int(time.time() * 1000),\n                })\n\n      \
-          \  tracker = _MLflowRESTTracker()\n        tracker.create_experiment(\"\
-          data-strat-ingest\")\n        tracker.start_run(run_name=f\"ingest-{collection_name}\"\
-          )\n        tracker.log_param(\"pipeline_run_id\", pipeline_run_id)\n   \
-          \     tracker.log_param(\"collection_name\", collection_name)\n        tracker.log_param(\"\
-          embedding_model\", embedding_model)\n        tracker.log_param(\"embedding_dim\"\
-          , str(embedding_dim))\n        tracker.log_param(\"index_type\", index_type)\n\
-          \        tracker.log_param(\"milvus_host\", milvus_host)\n        tracker.log_param(\"\
-          s3_bucket\", s3_bucket)\n        tracker.log_param(\"s3_prefix\", s3_prefix)\n\
-          \        tracker.log_param(\"embed_batch_size\", str(embed_batch_size))\n\
-          \        tracker.log_param(\"milvus_batch_size\", str(milvus_batch_size))\n\
-          \        tracker.log_param(\"drop_existing\", str(drop_existing))\n    \
-          \    tracker.log_metric(\"vectors_inserted\", float(total_inserted))\n \
-          \       tracker.log_metric(\"documents_processed\", float(file_count))\n\
-          \        tracker.log_metric(\"duration_seconds\", wall_clock)\n        tracker.log_metric(\"\
-          vectors_per_second\", float(total_inserted / max(wall_clock, 0.1)))\n  \
-          \      tracker.end_run()\n        print(\"MLflow: logged ingest run to experiment\
-          \ 'data-strat-ingest'\")\n    except Exception as e:\n        print(f\"\
-          MLflow tracking failed (non-blocking): {e}\")\n\n    return f\"{collection_name}:{total_inserted}\"\
-          \n\n"
+          \       })\n\n            def end_run(self, status=\"FINISHED\", run_id=None):\n\
+          \                \"\"\"End a specific run (or the current run).\"\"\"\n\
+          \                target = run_id or self._run_id\n                if not\
+          \ target:\n                    return\n                self._post(\"/api/2.0/mlflow/runs/update\"\
+          , {\n                    \"run_id\": target, \"status\": status,\n     \
+          \               \"end_time\": int(time.time() * 1000),\n               \
+          \ })\n\n        tracker = _MLflowRESTTracker()\n        tracker.create_experiment(\"\
+          data-strat-ingest\")\n\n        parent_id = tracker.find_run_by_name(pipeline_run_id\
+          \ or \"unknown\")\n\n        if parent_id:\n            tracker.create_nested_run(\"\
+          ingest_to_milvus\", parent_id)\n        else:\n            tracker.start_run(run_name=f\"\
+          ingest-{collection_name}\")\n            print(\"MLflow: parent run not\
+          \ found, creating standalone run\")\n\n        tracker.log_param(\"pipeline_run_id\"\
+          , pipeline_run_id)\n        tracker.log_param(\"collection_name\", collection_name)\n\
+          \        tracker.log_param(\"embedding_model\", embedding_model)\n     \
+          \   tracker.log_param(\"embedding_dim\", str(embedding_dim))\n        tracker.log_param(\"\
+          index_type\", index_type)\n        tracker.log_param(\"milvus_host\", milvus_host)\n\
+          \        tracker.log_param(\"s3_bucket\", s3_bucket)\n        tracker.log_param(\"\
+          s3_prefix\", s3_prefix)\n        tracker.log_param(\"embed_batch_size\"\
+          , str(embed_batch_size))\n        tracker.log_param(\"milvus_batch_size\"\
+          , str(milvus_batch_size))\n        tracker.log_param(\"drop_existing\",\
+          \ str(drop_existing))\n        tracker.log_metric(\"vectors_inserted\",\
+          \ float(total_inserted))\n        tracker.log_metric(\"documents_processed\"\
+          , float(file_count))\n        tracker.log_metric(\"duration_seconds\", wall_clock)\n\
+          \        tracker.log_metric(\"vectors_per_second\", float(total_inserted\
+          \ / max(wall_clock, 0.1)))\n        tracker.end_run()\n\n        if parent_id:\n\
+          \            tracker.end_run(status=\"FINISHED\", run_id=parent_id)\n  \
+          \          print(f\"MLflow: logged ingest_to_milvus + closed parent run\
+          \ {pipeline_run_id}\")\n        else:\n            print(\"MLflow: logged\
+          \ ingest_to_milvus as standalone run\")\n    except Exception as e:\n  \
+          \      print(f\"MLflow tracking failed (non-blocking): {e}\")\n\n    return\
+          \ f\"{collection_name}:{total_inserted}\"\n\n"
         image: registry.redhat.io/rhoai/odh-pipeline-runtime-datascience-cpu-py312-rhel9@sha256:f9844dc150592a9f196283b3645dda92bd80dfdb3d467fa8725b10267ea5bdbc
     exec-parse-and-chunk:
       container:
@@ -1072,37 +1106,70 @@ deploymentSpec:
           , {\n                    \"experiment_id\": self._experiment_id, \"run_name\"\
           : run_name,\n                })\n                self._run_id = result.get(\"\
           run\", {}).get(\"info\", {}).get(\"run_id\")\n                return self._run_id\n\
-          \n            def log_param(self, key, value):\n                if not self._run_id:\n\
-          \                    return\n                self._post(\"/api/2.0/mlflow/runs/log-parameter\"\
+          \n            def create_parent_run(self, run_name, tags=None):\n      \
+          \          \"\"\"Create a parent run (pipeline-level).\"\"\"\n         \
+          \       body = {\n                    \"experiment_id\": self._experiment_id,\n\
+          \                    \"run_name\": run_name,\n                }\n      \
+          \          if tags:\n                    body[\"tags\"] = [{\"key\": k,\
+          \ \"value\": str(v)} for k, v in tags.items()]\n                result =\
+          \ self._post(\"/api/2.0/mlflow/runs/create\", body)\n                return\
+          \ result.get(\"run\", {}).get(\"info\", {}).get(\"run_id\")\n\n        \
+          \    def create_nested_run(self, run_name, parent_run_id):\n           \
+          \     \"\"\"Create a nested run under a parent.\"\"\"\n                result\
+          \ = self._post(\"/api/2.0/mlflow/runs/create\", {\n                    \"\
+          experiment_id\": self._experiment_id,\n                    \"run_name\"\
+          : run_name,\n                    \"tags\": [\n                        {\"\
+          key\": \"mlflow.parentRunId\", \"value\": parent_run_id},\n            \
+          \        ],\n                })\n                self._run_id = result.get(\"\
+          run\", {}).get(\"info\", {}).get(\"run_id\")\n                return self._run_id\n\
+          \n            def find_run_by_name(self, run_name):\n                \"\"\
+          \"Find a run by name in the current experiment.\"\"\"\n                resp\
+          \ = _req.post(\n                    f\"{self._url}/api/2.0/mlflow/runs/search\"\
+          ,\n                    json={\n                        \"experiment_ids\"\
+          : [self._experiment_id],\n                        \"filter\": f\"tags.`mlflow.runName`\
+          \ = '{run_name}'\",\n                        \"max_results\": 1,\n     \
+          \               },\n                    headers=self._headers, verify=False,\
+          \ timeout=10,\n                )\n                if resp.ok:\n        \
+          \            runs = resp.json().get(\"runs\", [])\n                    if\
+          \ runs:\n                        return runs[0].get(\"info\", {}).get(\"\
+          run_id\")\n                return None\n\n            def log_param(self,\
+          \ key, value):\n                if not self._run_id:\n                 \
+          \   return\n                self._post(\"/api/2.0/mlflow/runs/log-parameter\"\
           , {\n                    \"run_id\": self._run_id, \"key\": key, \"value\"\
           : str(value),\n                })\n\n            def log_metric(self, key,\
           \ value):\n                if not self._run_id:\n                    return\n\
           \                self._post(\"/api/2.0/mlflow/runs/log-metric\", {\n   \
           \                 \"run_id\": self._run_id, \"key\": key, \"value\": float(value),\n\
           \                    \"timestamp\": int(time.time() * 1000),\n         \
-          \       })\n\n            def end_run(self, status=\"FINISHED\"):\n    \
-          \            if not self._run_id:\n                    return\n        \
-          \        self._post(\"/api/2.0/mlflow/runs/update\", {\n               \
-          \     \"run_id\": self._run_id, \"status\": status,\n                  \
-          \  \"end_time\": int(time.time() * 1000),\n                })\n\n      \
-          \  duration_seconds = time.time() - start_time\n        tracker = _MLflowRESTTracker()\n\
-          \        tracker.create_experiment(\"data-strat-ingest\")\n        tracker.start_run(run_name=f\"\
-          parse-{rayjob_name}\")\n        tracker.log_param(\"pipeline_run_id\", pipeline_run_id\
-          \ or \"unknown\")\n        tracker.log_param(\"num_files\", str(num_files))\n\
-          \        tracker.log_param(\"chunk_max_tokens\", str(chunk_max_tokens))\n\
-          \        tracker.log_param(\"embedding_model\", tokenizer)\n        tracker.log_param(\"\
-          num_workers\", str(num_workers))\n        tracker.log_param(\"worker_cpus\"\
-          , str(worker_cpus))\n        tracker.log_param(\"worker_memory_gb\", str(worker_memory_gb))\n\
+          \       })\n\n            def end_run(self, status=\"FINISHED\", run_id=None):\n\
+          \                \"\"\"End a specific run (or the current run).\"\"\"\n\
+          \                target = run_id or self._run_id\n                if not\
+          \ target:\n                    return\n                self._post(\"/api/2.0/mlflow/runs/update\"\
+          , {\n                    \"run_id\": target, \"status\": status,\n     \
+          \               \"end_time\": int(time.time() * 1000),\n               \
+          \ })\n\n        duration_seconds = time.time() - start_time\n        tracker\
+          \ = _MLflowRESTTracker()\n        tracker.create_experiment(\"data-strat-ingest\"\
+          )\n\n        parent_id = tracker.create_parent_run(\n            run_name=pipeline_run_id\
+          \ or \"unknown\",\n            tags={\n                \"kfp.pipeline_run_id\"\
+          : pipeline_run_id or \"unknown\",\n                \"kfp.namespace\": namespace,\n\
+          \                \"kfp.component\": \"pipeline\",\n            },\n    \
+          \    )\n\n        tracker.create_nested_run(\"parse_and_chunk\", parent_id)\n\
+          \        tracker.log_param(\"pipeline_run_id\", pipeline_run_id or \"unknown\"\
+          )\n        tracker.log_param(\"num_files\", str(num_files))\n        tracker.log_param(\"\
+          chunk_max_tokens\", str(chunk_max_tokens))\n        tracker.log_param(\"\
+          embedding_model\", tokenizer)\n        tracker.log_param(\"num_workers\"\
+          , str(num_workers))\n        tracker.log_param(\"worker_cpus\", str(worker_cpus))\n\
+          \        tracker.log_param(\"worker_memory_gb\", str(worker_memory_gb))\n\
           \        tracker.log_param(\"s3_bucket\", s3_bucket)\n        tracker.log_param(\"\
           s3_prefix\", s3_prefix)\n        tracker.log_param(\"doc_category\", doc_category)\n\
           \        tracker.log_param(\"doc_subcategory\", doc_subcategory)\n     \
           \   tracker.log_param(\"doc_date\", doc_date)\n        tracker.log_param(\"\
           ray_image\", ray_image)\n        tracker.log_param(\"namespace\", namespace)\n\
           \        tracker.log_metric(\"duration_seconds\", duration_seconds)\n  \
-          \      tracker.end_run()\n        print(\"MLflow: logged parse run to experiment\
-          \ 'data-strat-ingest'\")\n    except Exception as e:\n        print(f\"\
-          MLflow tracking failed (non-blocking): {e}\")\n\n    return f\"s3://{s3_bucket}/{s3_prefix}\"\
-          \n\n"
+          \      tracker.end_run()\n        print(f\"MLflow: logged parse_and_chunk\
+          \ as nested run under parent {pipeline_run_id}\")\n    except Exception\
+          \ as e:\n        print(f\"MLflow tracking failed (non-blocking): {e}\")\n\
+          \n    return f\"s3://{s3_bucket}/{s3_prefix}\"\n\n"
         image: registry.redhat.io/rhoai/odh-pipeline-runtime-datascience-cpu-py312-rhel9@sha256:f9844dc150592a9f196283b3645dda92bd80dfdb3d467fa8725b10267ea5bdbc
 pipelineInfo:
   description: 'Data-chain-only RAG pipeline: parse & chunk PDFs with Docling (output
