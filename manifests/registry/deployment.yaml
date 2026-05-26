@@ -22,7 +22,9 @@ spec:
             - /bin/sh
             - -c
             - |
-              git clone --branch main --depth 1 https://github.com/briangallagher/data-strat-poc.git /app-src
+              git clone --branch main --depth 1 --filter=blob:limit=50k --sparse https://github.com/briangallagher/data-strat-poc.git /app-src
+              cd /app-src
+              git sparse-checkout set src/registry
           volumeMounts:
             - name: app-source
               mountPath: /app-src
@@ -33,14 +35,17 @@ spec:
             - /bin/bash
             - -c
             - |
-              pip install --quiet fastapi "uvicorn[standard]" sqlalchemy psycopg2-binary pydantic httpx
+              set -ex
+              pip install fastapi "uvicorn[standard]" sqlalchemy psycopg2-binary pydantic httpx
+              ls -la /app-src/src/registry/
               cd /app-src/src
+              python -c "from registry.app import app; print('Import OK')"
               exec uvicorn registry.app:app --host 0.0.0.0 --port 8080
           ports:
             - containerPort: 8080
           env:
             - name: DATABASE_URL
-              value: "postgresql://marquez:marquez@marquez-db:5432/doc_registry"
+              value: "postgresql://marquez:marquez123@marquez-db:5432/doc_registry"
             - name: CORPUS_DIR
               value: ""
           resources:

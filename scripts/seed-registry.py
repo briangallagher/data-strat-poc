@@ -25,7 +25,7 @@ COLLECTIONS = [
 
 
 def seed(registry_url: str) -> None:
-    client = httpx.Client(base_url=registry_url, timeout=30.0)
+    client = httpx.Client(base_url=registry_url, timeout=30.0, verify=False)
 
     print("=== Creating collections ===")
     for coll in COLLECTIONS:
