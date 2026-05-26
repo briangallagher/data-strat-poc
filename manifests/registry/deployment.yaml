@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: doc-registry
+  namespace: data-strat-poc
+  labels:
+    app: doc-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: doc-registry
+  template:
+    metadata:
+      labels:
+        app: doc-registry
+    spec:
+      initContainers:
+        - name: git-clone
+          image: alpine/git:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              git clone --branch main --depth 1 https://github.com/briangallagher/data-strat-poc.git /app-src
+          volumeMounts:
+            - name: app-source
+              mountPath: /app-src
+      containers:
+        - name: registry
+          image: python:3.12-slim
+          command:
+            - /bin/bash
+            - -c
+            - |
+              pip install --quiet fastapi "uvicorn[standard]" sqlalchemy psycopg2-binary pydantic httpx
+              cd /app-src/src
+              exec uvicorn registry.app:app --host 0.0.0.0 --port 8080
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://marquez:marquez@marquez-db:5432/doc_registry"
+            - name: CORPUS_DIR
+              value: ""
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /docs
+              port: 8080
+            initialDelaySeconds: 45
+            periodSeconds: 10
+          volumeMounts:
+            - name: app-source
+              mountPath: /app-src
+      volumes:
+        - name: app-source
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: doc-registry
+  namespace: data-strat-poc
+spec:
+  selector:
+    app: doc-registry
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: doc-registry
+  namespace: data-strat-poc
+spec:
+  to:
+    kind: Service
+    name: doc-registry
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

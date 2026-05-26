@@ -1,0 +1,487 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Old Snapshot tests - remove when refactoring passes additional classes 1`] = `
+<DocumentFragment>
+  <button
+    aria-expanded="false"
+    class="pf-v6-c-menu-toggle test-class"
+    data-ouia-component-id="OUIA-Generated-MenuToggle-:r3:"
+    data-ouia-component-type="PF6/MenuToggle"
+    data-ouia-safe="true"
+    type="button"
+  >
+    <span
+      class="pf-v6-c-menu-toggle__text"
+    >
+      Toggle
+    </span>
+    <span
+      class="pf-v6-c-menu-toggle__controls"
+    >
+      <span
+        class="pf-v6-c-menu-toggle__toggle-icon"
+      >
+        <svg
+          aria-hidden="true"
+          class="pf-v6-svg"
+          fill="currentColor"
+          height="1em"
+          role="img"
+          width="1em"
+        >
+          <svg
+            class="pf-v6-icon-default"
+            viewBox="0 0 320 512"
+          >
+            <path
+              d="M31.3 192h257.3c17.8 0 26.7 21.5 14.1 34.1L174.1 354.8c-7.8 7.8-20.5 7.8-28.3 0L17.2 226.1C4.6 213.5 13.5 192 31.3 192z"
+            />
+          </svg>
+          <svg
+            class="pf-v6-icon-rh-ui"
+            viewBox="0 0 32 32"
+          >
+            <path
+              d="M16 24.792c-.384 0-.769-.146-1.061-.438L2.293 11.707a.999.999 0 1 1 1.414-1.414L16 22.586l12.293-12.293a.999.999 0 1 1 1.414 1.414L17.061 24.353a1.497 1.497 0 0 1-1.061.438Z"
+            />
+          </svg>
+        </svg>
+      </span>
+    </span>
+  </button>
+</DocumentFragment>
+`;
+
+exports[`Old Snapshot tests - remove when refactoring renders successfully 1`] = `
+<DocumentFragment>
+  <button
+    aria-expanded="false"
+    class="pf-v6-c-menu-toggle"
+    data-ouia-component-id="OUIA-Generated-MenuToggle-:r1:"
+    data-ouia-component-type="PF6/MenuToggle"
+    data-ouia-safe="true"
+    type="button"
+  >
+    <span
+      class="pf-v6-c-menu-toggle__text"
+    >
+      Toggle
+    </span>
+    <span
+      class="pf-v6-c-menu-toggle__controls"
+    >
+      <span
+        class="pf-v6-c-menu-toggle__toggle-icon"
+      >
+        <svg
+          aria-hidden="true"
+          class="pf-v6-svg"
+          fill="currentColor"
+          height="1em"
+          role="img"
+          width="1em"
+        >
+          <svg
+            class="pf-v6-icon-default"
+            viewBox="0 0 320 512"
+          >
+            <path
+              d="M31.3 192h257.3c17.8 0 26.7 21.5 14.1 34.1L174.1 354.8c-7.8 7.8-20.5 7.8-28.3 0L17.2 226.1C4.6 213.5 13.5 192 31.3 192z"
+            />
+          </svg>
+          <svg
+            class="pf-v6-icon-rh-ui"
+            viewBox="0 0 32 32"
+          >
+            <path
+              d="M16 24.792c-.384 0-.769-.146-1.061-.438L2.293 11.707a.999.999 0 1 1 1.414-1.414L16 22.586l12.293-12.293a.999.999 0 1 1 1.414 1.414L17.061 24.353a1.497 1.497 0 0 1-1.061.438Z"
+            />
+          </svg>
+        </svg>
+      </span>
+    </span>
+  </button>
+</DocumentFragment>
+`;
+
+exports[`Old Snapshot tests - remove when refactoring shows badge 1`] = `
+<DocumentFragment>
+  <button
+    aria-expanded="false"
+    class="pf-v6-c-menu-toggle"
+    data-ouia-component-id="OUIA-Generated-MenuToggle-:rh:"
+    data-ouia-component-type="PF6/MenuToggle"
+    data-ouia-safe="true"
+    type="button"
+  >
+    <span
+      class="pf-v6-c-menu-toggle__text"
+    >
+      Toggle
+    </span>
+    <span
+      class="pf-v6-c-menu-toggle__count"
+    >
+      <span
+        class="pf-v6-c-badge pf-m-unread"
+      >
+        badge
+      </span>
+    </span>
+    <span
+      class="pf-v6-c-menu-toggle__controls"
+    >
+      <span
+        class="pf-v6-c-menu-toggle__toggle-icon"
+      >
+        <svg
+          aria-hidden="true"
+          class="pf-v6-svg"
+          fill="currentColor"
+          height="1em"
+          role="img"
+          width="1em"
+        >
+          <svg
+            class="pf-v6-icon-default"
+            viewBox="0 0 320 512"
+          >
+            <path
+              d="M31.3 192h257.3c17.8 0 26.7 21.5 14.1 34.1L174.1 354.8c-7.8 7.8-20.5 7.8-28.3 0L17.2 226.1C4.6 213.5 13.5 192 31.3 192z"
+            />
+          </svg>
+          <svg
+            class="pf-v6-icon-rh-ui"
+            viewBox="0 0 32 32"
+          >
+            <path
+              d="M16 24.792c-.384 0-.769-.146-1.061-.438L2.293 11.707a.999.999 0 1 1 1.414-1.414L16 22.586l12.293-12.293a.999.999 0 1 1 1.414 1.414L17.061 24.353a1.497 1.497 0 0 1-1.061.438Z"
+            />
+          </svg>
+        </svg>
+      </span>
+    </span>
+  </button>
+</DocumentFragment>
+`;
+
+exports[`Old Snapshot tests - remove when refactoring shows icon 1`] = `
+<DocumentFragment>
+  <button
+    aria-expanded="false"
+    class="pf-v6-c-menu-toggle"
+    data-ouia-component-id="OUIA-Generated-MenuToggle-:rf:"
+    data-ouia-component-type="PF6/MenuToggle"
+    data-ouia-safe="true"
+    type="button"
+  >
+    <span
+      class="pf-v6-c-menu-toggle__icon"
+    >
+      <svg
+        aria-hidden="true"
+        class="pf-v6-svg"
+        fill="currentColor"
+        height="1em"
+        role="img"
+        viewBox="0 0 32 32"
+        width="1em"
+      >
+        <path
+          d="M26.463 16.845a9.635 9.635 0 0 0-.002-1.688l3.41-1.974a.5.5 0 0 0 .235-.548 14.47 14.47 0 0 0-4.142-7.167.5.5 0 0 0-.594-.07l-3.404 1.97c-.469-.326-.96-.61-1.466-.85V2.58a.5.5 0 0 0-.356-.48 14.662 14.662 0 0 0-8.288 0 .5.5 0 0 0-.356.48v3.944c-.513.245-1.003.528-1.462.846L6.63 5.397a.5.5 0 0 0-.594.07 14.47 14.47 0 0 0-4.142 7.168.5.5 0 0 0 .236.548l3.407 1.972a9.635 9.635 0 0 0 .002 1.688l-3.41 1.974a.5.5 0 0 0-.235.548 14.47 14.47 0 0 0 4.142 7.167c.16.154.405.18.594.07l3.404-1.97c.469.326.96.61 1.466.85v3.938a.5.5 0 0 0 .356.48c1.333.398 2.728.6 4.144.6s2.81-.202 4.144-.6a.5.5 0 0 0 .356-.48v-3.944a10.449 10.449 0 0 0 1.462-.846l3.408 1.973a.5.5 0 0 0 .594-.07 14.47 14.47 0 0 0 4.142-7.168.5.5 0 0 0-.236-.548l-3.407-1.972ZM16 21c-2.757 0-5-2.243-5-5s2.243-5 5-5 5 2.243 5 5-2.243 5-5 5Z"
+        />
+      </svg>
+    </span>
+    <span
+      class="pf-v6-c-menu-toggle__text"
+    >
+      Toggle
+    </span>
+    <span
+      class="pf-v6-c-menu-toggle__controls"
+    >
+      <span
+        class="pf-v6-c-menu-toggle__toggle-icon"
+      >
+        <svg
+          aria-hidden="true"
+          class="pf-v6-svg"
+          fill="currentColor"
+          height="1em"
+          role="img"
+          width="1em"
+        >
+          <svg
+            class="pf-v6-icon-default"
+            viewBox="0 0 320 512"
+          >
+            <path
+              d="M31.3 192h257.3c17.8 0 26.7 21.5 14.1 34.1L174.1 354.8c-7.8 7.8-20.5 7.8-28.3 0L17.2 226.1C4.6 213.5 13.5 192 31.3 192z"
+            />
+          </svg>
+          <svg
+            class="pf-v6-icon-rh-ui"
+            viewBox="0 0 32 32"
+          >
+            <path
+              d="M16 24.792c-.384 0-.769-.146-1.061-.438L2.293 11.707a.999.999 0 1 1 1.414-1.414L16 22.586l12.293-12.293a.999.999 0 1 1 1.414 1.414L17.061 24.353a1.497 1.497 0 0 1-1.061.438Z"
+            />
+          </svg>
+        </svg>
+      </span>
+    </span>
+  </button>
+</DocumentFragment>
+`;
+
+exports[`Old Snapshot tests - remove when refactoring shows isDisabled 1`] = `
+<DocumentFragment>
+  <button
+    aria-expanded="false"
+    class="pf-v6-c-menu-toggle pf-m-disabled"
+    data-ouia-component-id="OUIA-Generated-MenuToggle-:r7:"
+    data-ouia-component-type="PF6/MenuToggle"
+    data-ouia-safe="true"
+    disabled=""
+    type="button"
+  >
+    <span
+      class="pf-v6-c-menu-toggle__text"
+    >
+      Toggle
+    </span>
+    <span
+      class="pf-v6-c-menu-toggle__controls"
+    >
+      <span
+        class="pf-v6-c-menu-toggle__toggle-icon"
+      >
+        <svg
+          aria-hidden="true"
+          class="pf-v6-svg"
+          fill="currentColor"
+          height="1em"
+          role="img"
+          width="1em"
+        >
+          <svg
+            class="pf-v6-icon-default"
+            viewBox="0 0 320 512"
+          >
+            <path
+              d="M31.3 192h257.3c17.8 0 26.7 21.5 14.1 34.1L174.1 354.8c-7.8 7.8-20.5 7.8-28.3 0L17.2 226.1C4.6 213.5 13.5 192 31.3 192z"
+            />
+          </svg>
+          <svg
+            class="pf-v6-icon-rh-ui"
+            viewBox="0 0 32 32"
+          >
+            <path
+              d="M16 24.792c-.384 0-.769-.146-1.061-.438L2.293 11.707a.999.999 0 1 1 1.414-1.414L16 22.586l12.293-12.293a.999.999 0 1 1 1.414 1.414L17.061 24.353a1.497 1.497 0 0 1-1.061.438Z"
+            />
+          </svg>
+        </svg>
+      </span>
+    </span>
+  </button>
+</DocumentFragment>
+`;
+
+exports[`Old Snapshot tests - remove when refactoring shows isExpanded 1`] = `
+<DocumentFragment>
+  <button
+    aria-expanded="true"
+    class="pf-v6-c-menu-toggle pf-m-expanded"
+    data-ouia-component-id="OUIA-Generated-MenuToggle-:r5:"
+    data-ouia-component-type="PF6/MenuToggle"
+    data-ouia-safe="true"
+    type="button"
+  >
+    <span
+      class="pf-v6-c-menu-toggle__text"
+    >
+      Toggle
+    </span>
+    <span
+      class="pf-v6-c-menu-toggle__controls"
+    >
+      <span
+        class="pf-v6-c-menu-toggle__toggle-icon"
+      >
+        <svg
+          aria-hidden="true"
+          class="pf-v6-svg"
+          fill="currentColor"
+          height="1em"
+          role="img"
+          width="1em"
+        >
+          <svg
+            class="pf-v6-icon-default"
+            viewBox="0 0 320 512"
+          >
+            <path
+              d="M31.3 192h257.3c17.8 0 26.7 21.5 14.1 34.1L174.1 354.8c-7.8 7.8-20.5 7.8-28.3 0L17.2 226.1C4.6 213.5 13.5 192 31.3 192z"
+            />
+          </svg>
+          <svg
+            class="pf-v6-icon-rh-ui"
+            viewBox="0 0 32 32"
+          >
+            <path
+              d="M16 24.792c-.384 0-.769-.146-1.061-.438L2.293 11.707a.999.999 0 1 1 1.414-1.414L16 22.586l12.293-12.293a.999.999 0 1 1 1.414 1.414L17.061 24.353a1.497 1.497 0 0 1-1.061.438Z"
+            />
+          </svg>
+        </svg>
+      </span>
+    </span>
+  </button>
+</DocumentFragment>
+`;
+
+exports[`Old Snapshot tests - remove when refactoring shows isPlain 1`] = `
+<DocumentFragment>
+  <button
+    aria-expanded="false"
+    class="pf-v6-c-menu-toggle pf-m-plain"
+    data-ouia-component-id="OUIA-Generated-MenuToggle-plain-:rb:"
+    data-ouia-component-type="PF6/MenuToggle"
+    data-ouia-safe="true"
+    type="button"
+  >
+    <span
+      class="pf-v6-c-menu-toggle__icon"
+    >
+      <svg
+        aria-hidden="true"
+        class="pf-v6-svg"
+        fill="currentColor"
+        height="1em"
+        role="img"
+        width="1em"
+      >
+        <svg
+          class="pf-v6-icon-default"
+          viewBox="0 0 192 512"
+        >
+          <path
+            d="M96 184c39.8 0 72 32.2 72 72s-32.2 72-72 72-72-32.2-72-72 32.2-72 72-72zM24 80c0 39.8 32.2 72 72 72s72-32.2 72-72S135.8 8 96 8 24 40.2 24 80zm0 352c0 39.8 32.2 72 72 72s72-32.2 72-72-32.2-72-72-72-72 32.2-72 72z"
+          />
+        </svg>
+        <svg
+          class="pf-v6-icon-rh-ui"
+          viewBox="0 0 32 32"
+        >
+          <path
+            d="M16 9c2.206 0 4-1.794 4-4s-1.794-4-4-4-4 1.794-4 4 1.794 4 4 4Zm0-6c1.103 0 2 .897 2 2s-.897 2-2 2-2-.897-2-2 .897-2 2-2Zm0 9c-2.206 0-4 1.794-4 4s1.794 4 4 4 4-1.794 4-4-1.794-4-4-4Zm0 6c-1.103 0-2-.897-2-2s.897-2 2-2 2 .897 2 2-.897 2-2 2Zm0 5c-2.206 0-4 1.794-4 4s1.794 4 4 4 4-1.794 4-4-1.794-4-4-4Zm0 6c-1.103 0-2-.897-2-2s.897-2 2-2 2 .897 2 2-.897 2-2 2Z"
+          />
+        </svg>
+      </svg>
+    </span>
+  </button>
+</DocumentFragment>
+`;
+
+exports[`Old Snapshot tests - remove when refactoring shows isPrimary 1`] = `
+<DocumentFragment>
+  <button
+    aria-expanded="false"
+    class="pf-v6-c-menu-toggle pf-m-primary"
+    data-ouia-component-id="OUIA-Generated-MenuToggle-primary-:r9:"
+    data-ouia-component-type="PF6/MenuToggle"
+    data-ouia-safe="true"
+    type="button"
+  >
+    <span
+      class="pf-v6-c-menu-toggle__text"
+    >
+      Toggle
+    </span>
+    <span
+      class="pf-v6-c-menu-toggle__controls"
+    >
+      <span
+        class="pf-v6-c-menu-toggle__toggle-icon"
+      >
+        <svg
+          aria-hidden="true"
+          class="pf-v6-svg"
+          fill="currentColor"
+          height="1em"
+          role="img"
+          width="1em"
+        >
+          <svg
+            class="pf-v6-icon-default"
+            viewBox="0 0 320 512"
+          >
+            <path
+              d="M31.3 192h257.3c17.8 0 26.7 21.5 14.1 34.1L174.1 354.8c-7.8 7.8-20.5 7.8-28.3 0L17.2 226.1C4.6 213.5 13.5 192 31.3 192z"
+            />
+          </svg>
+          <svg
+            class="pf-v6-icon-rh-ui"
+            viewBox="0 0 32 32"
+          >
+            <path
+              d="M16 24.792c-.384 0-.769-.146-1.061-.438L2.293 11.707a.999.999 0 1 1 1.414-1.414L16 22.586l12.293-12.293a.999.999 0 1 1 1.414 1.414L17.061 24.353a1.497 1.497 0 0 1-1.061.438Z"
+            />
+          </svg>
+        </svg>
+      </span>
+    </span>
+  </button>
+</DocumentFragment>
+`;
+
+exports[`Old Snapshot tests - remove when refactoring shows plain text 1`] = `
+<DocumentFragment>
+  <button
+    aria-expanded="false"
+    class="pf-v6-c-menu-toggle pf-m-plain pf-m-text"
+    data-ouia-component-id="OUIA-Generated-MenuToggle-plainText-:rd:"
+    data-ouia-component-type="PF6/MenuToggle"
+    data-ouia-safe="true"
+    type="button"
+  >
+    <span
+      class="pf-v6-c-menu-toggle__text"
+    >
+      Toggle
+    </span>
+    <span
+      class="pf-v6-c-menu-toggle__controls"
+    >
+      <span
+        class="pf-v6-c-menu-toggle__toggle-icon"
+      >
+        <svg
+          aria-hidden="true"
+          class="pf-v6-svg"
+          fill="currentColor"
+          height="1em"
+          role="img"
+          width="1em"
+        >
+          <svg
+            class="pf-v6-icon-default"
+            viewBox="0 0 320 512"
+          >
+            <path
+              d="M31.3 192h257.3c17.8 0 26.7 21.5 14.1 34.1L174.1 354.8c-7.8 7.8-20.5 7.8-28.3 0L17.2 226.1C4.6 213.5 13.5 192 31.3 192z"
+            />
+          </svg>
+          <svg
+            class="pf-v6-icon-rh-ui"
+            viewBox="0 0 32 32"
+          >
+            <path
+              d="M16 24.792c-.384 0-.769-.146-1.061-.438L2.293 11.707a.999.999 0 1 1 1.414-1.414L16 22.586l12.293-12.293a.999.999 0 1 1 1.414 1.414L17.061 24.353a1.497 1.497 0 0 1-1.061.438Z"
+            />
+          </svg>
+        </svg>
+      </span>
+    </span>
+  </button>
+</DocumentFragment>
+`;

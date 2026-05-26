@@ -1,0 +1,11 @@
+import { createIconBase } from '../createIcon.js';
+
+export const RhUiPlayFillIconConfig = {
+  name: 'RhUiPlayFillIcon',
+  icon: {"xOffset":0,"yOffset":0,"width":32,"height":32,"svgPathData":"M31 16c0 .379-.214.725-.553.895l-28 14a1.005 1.005 0 0 1-.973-.044A1.001 1.001 0 0 1 1 30V2c0-.347.18-.668.474-.851.295-.182.663-.198.973-.044l28 14A1 1 0 0 1 31 16Z"},
+  rhUiIcon: null,
+};
+
+export const RhUiPlayFillIcon = createIconBase(RhUiPlayFillIconConfig);
+
+export default RhUiPlayFillIcon;

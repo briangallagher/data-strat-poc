@@ -1,0 +1,35 @@
+# Multi-collection pipeline configuration
+# Each collection is processed as a separate pipeline run with its own pipeline_run_id.
+
+cluster:
+  namespace: data-strat-poc
+  dsp_route: ds-pipeline-dspa
+  s3_endpoint: http://minio-service.data-strat-poc.svc.cluster.local:9000
+  s3_bucket: rag-chunks
+  s3_secret_name: minio-secret
+  milvus_host: milvus.data-strat-poc.svc.cluster.local
+  milvus_port: 19530
+  registry_url: http://doc-registry.data-strat-poc.svc.cluster.local:8080
+
+pipeline:
+  ray_image: quay.io/rhoai-szaher/docling-ray:latest
+  embedding_model: ibm-granite/granite-embedding-125m-english
+  embedding_dim: 768
+  chunk_max_tokens: 256
+  num_workers: 1
+  worker_cpus: 4
+  worker_memory_gb: 8
+  bypass_kueue: true
+
+collections:
+  - name: underwriting_guidelines
+    connector_type: s3
+    drop_existing: true
+
+  - name: regulatory_bulletins
+    connector_type: s3
+    drop_existing: true
+
+  - name: iso_forms
+    connector_type: s3
+    drop_existing: true

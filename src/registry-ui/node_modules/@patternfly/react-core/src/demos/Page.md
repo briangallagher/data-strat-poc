@@ -1,0 +1,54 @@
+---
+id: Page
+section: components
+---
+
+import { useState, useRef, useEffect } from 'react';
+import RhUiNotificationFillIcon from '@patternfly/react-icons/dist/esm/icons/rh-ui-notification-fill-icon';
+import RhUiSettingsFillIcon from '@patternfly/react-icons/dist/esm/icons/rh-ui-settings-fill-icon';
+import HelpIcon from '@patternfly/react-icons/dist/esm/icons/help-icon';
+import RhUiQuestionMarkCircleFillIcon from '@patternfly/react-icons/dist/esm/icons/rh-ui-question-mark-circle-fill-icon';
+import imgAvatar from '@patternfly/react-core/src/components/assets/avatarImg.svg';
+import BarsIcon from '@patternfly/react-icons/dist/esm/icons/bars-icon';
+import LightbulbIcon from '@patternfly/react-icons/dist/esm/icons/lightbulb-icon';
+import EllipsisVIcon from '@patternfly/react-icons/dist/esm/icons/ellipsis-v-icon';
+import CubeIcon from '@patternfly/react-icons/dist/esm/icons/cube-icon';
+import FolderIcon from '@patternfly/react-icons/dist/esm/icons/folder-icon';
+import CloudIcon from '@patternfly/react-icons/dist/esm/icons/cloud-icon';
+import CodeIcon from '@patternfly/react-icons/dist/esm/icons/code-icon';
+import pfLogo from '@patternfly/react-core/src/demos/assets/PF-HorizontalLogo-Color.svg';
+import pfIconLogo from '@patternfly/react-core/src/demos/assets/PF-IconLogo-color.svg';
+
+- All examples set the `isManagedSidebar` prop on the Page component to have the sidebar automatically close for smaller screen widths. You can also manually control this behavior by not adding the `isManagedSidebar` prop and instead:
+  1. Add an onNavToggle callback to PageHeader
+  2. Pass a boolean into the isNavOpen prop to PageSidebar
+
+## Layouts
+
+This demonstrates a variety of navigation patterns in the context of a full page layout. These can be used as a basis for choosing the most appropriate page template for your application.
+
+### Sticky section group
+
+```ts file='./examples/Page/PageStickySectionGroup.tsx' isFullscreen
+
+```
+
+### Sticky section group (alternate syntax)
+
+```ts file='./examples/Page/PageStickySectionGroupAlternate.tsx' isFullscreen
+
+```
+
+### Sticky section breadcrumb (with breakpoints)
+
+```ts file='./examples/Page/PageStickySectionBreadcrumb.tsx' isFullscreen
+
+```
+
+### Context selector/perspective switcher in sidebar
+
+When adding a context selector/perspective switcher in a `PageSidebar`, you must manually control the open state of the `PageSidebar` as well as ensure any interactive menu toggles or buttons cannot receive focus. This demo adds a `tabIndex` of `-1` when the sidebar is not expanded to achieve this.
+
+```ts file='./examples/Page/PageContextSelector.tsx' isFullscreen
+
+```

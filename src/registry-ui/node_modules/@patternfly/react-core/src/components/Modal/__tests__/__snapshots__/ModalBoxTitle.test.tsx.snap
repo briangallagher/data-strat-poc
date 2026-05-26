@@ -1,0 +1,218 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ModalBoxTitle alert variant 1`] = `
+<DocumentFragment>
+  <h1
+    class="pf-v6-c-modal-box__title pf-m-icon pf-m-warning"
+    id="boxId"
+  >
+    <span
+      class="pf-v6-c-modal-box__title-icon"
+    >
+      <svg
+        aria-hidden="true"
+        class="pf-v6-svg"
+        fill="currentColor"
+        height="1em"
+        role="img"
+        viewBox="0 0 32 32"
+        width="1em"
+      >
+        <path
+          d="m31.874 28.514-15.011-27a1.001 1.001 0 0 0-1.748 0l-15.011 27A1 1 0 0 0 .978 30H31a1 1 0 0 0 .874-1.486ZM14.5 12a1.5 1.5 0 0 1 3 0v5a1.5 1.5 0 0 1-3 0v-5ZM16 26.001a2 2 0 1 1-.001-3.999A2 2 0 0 1 16 26.001Z"
+        />
+      </svg>
+    </span>
+    <span
+      class="pf-v6-screen-reader"
+    >
+      Warning alert:
+    </span>
+    <span
+      class="pf-v6-c-modal-box__title-text"
+    >
+      Test Modal Box warning
+    </span>
+  </h1>
+</DocumentFragment>
+`;
+
+exports[`ModalBoxTitle custom icon variant 1`] = `
+<DocumentFragment>
+  <h1
+    class="pf-v6-c-modal-box__title pf-m-icon"
+    id="boxId"
+  >
+    <span
+      class="pf-v6-c-modal-box__title-icon"
+    >
+      <svg
+        aria-hidden="true"
+        class="pf-v6-svg"
+        fill="currentColor"
+        height="1em"
+        role="img"
+        viewBox="0 0 576 512"
+        width="1em"
+      >
+        <path
+          d="M576 240c0-23.63-12.95-44.04-32-55.12V32.01C544 23.26 537.02 0 512 0c-7.12 0-14.19 2.38-19.98 7.02l-85.03 68.03C364.28 109.19 310.66 128 256 128H64c-35.35 0-64 28.65-64 64v96c0 35.35 28.65 64 64 64h33.7c-1.39 10.48-2.18 21.14-2.18 32 0 39.77 9.26 77.35 25.56 110.94 5.19 10.69 16.52 17.06 28.4 17.06h74.28c26.05 0 41.69-29.84 25.9-50.56-16.4-21.52-26.15-48.36-26.15-77.44 0-11.11 1.62-21.79 4.41-32H256c54.66 0 108.28 18.81 150.98 52.95l85.03 68.03a32.023 32.023 0 0 0 19.98 7.02c24.92 0 32-22.78 32-32V295.13C563.05 284.04 576 263.63 576 240zm-96 141.42l-33.05-26.44C392.95 311.78 325.12 288 256 288v-96c69.12 0 136.95-23.78 190.95-66.98L480 98.58v282.84z"
+        />
+      </svg>
+    </span>
+    <span
+      class="pf-v6-c-modal-box__title-text"
+    >
+      Test Modal Box custom
+    </span>
+  </h1>
+</DocumentFragment>
+`;
+
+exports[`ModalBoxTitle custom variant 1`] = `
+<DocumentFragment>
+  <h1
+    class="pf-v6-c-modal-box__title pf-m-icon pf-m-custom"
+    id="boxId"
+  >
+    <span
+      class="pf-v6-c-modal-box__title-icon"
+    >
+      <svg
+        aria-hidden="true"
+        class="pf-v6-svg"
+        fill="currentColor"
+        height="1em"
+        role="img"
+        viewBox="0 0 32 32"
+        width="1em"
+      >
+        <path
+          d="M28.75 22v3.5c0 .689-.561 1.25-1.25 1.25h-7.521c.005.084.021.166.021.25 0 2.206-1.794 4-4 4s-4-1.794-4-4c0-.084.016-.166.021-.25H4.5c-.689 0-1.25-.561-1.25-1.25V22a.75.75 0 0 1 .75-.75c1.24 0 2.25-1.009 2.25-2.25v-4c0-4.826 3.528-8.833 8.138-9.605A2.482 2.482 0 0 1 13.5 3.5C13.5 2.122 14.621 1 16 1s2.5 1.122 2.5 2.5c0 .761-.349 1.436-.888 1.895 4.61.772 8.138 4.779 8.138 9.605v4c0 1.241 1.01 2.25 2.25 2.25a.75.75 0 0 1 .75.75Z"
+        />
+      </svg>
+    </span>
+    <span
+      class="pf-v6-screen-reader"
+    >
+      Custom alert:
+    </span>
+    <span
+      class="pf-v6-c-modal-box__title-text"
+    >
+      Test Modal Box custom
+    </span>
+  </h1>
+</DocumentFragment>
+`;
+
+exports[`ModalBoxTitle danger variant 1`] = `
+<DocumentFragment>
+  <h1
+    class="pf-v6-c-modal-box__title pf-m-icon pf-m-danger"
+    id="boxId"
+  >
+    <span
+      class="pf-v6-c-modal-box__title-icon"
+    >
+      <svg
+        aria-hidden="true"
+        class="pf-v6-svg"
+        fill="currentColor"
+        height="1em"
+        role="img"
+        viewBox="0 0 32 32"
+        width="1em"
+      >
+        <path
+          d="M16 1C7.729 1 1 7.729 1 16s6.729 15 15 15 15-6.729 15-15S24.271 1 16 1Zm-1.5 8a1.5 1.5 0 1 1 3 0v7a1.5 1.5 0 1 1-3 0V9ZM16 25.001a2 2 0 1 1-.001-3.999A2 2 0 0 1 16 25.001Z"
+        />
+      </svg>
+    </span>
+    <span
+      class="pf-v6-screen-reader"
+    >
+      Danger alert:
+    </span>
+    <span
+      class="pf-v6-c-modal-box__title-text"
+    >
+      Test Modal Box danger
+    </span>
+  </h1>
+</DocumentFragment>
+`;
+
+exports[`ModalBoxTitle info variant 1`] = `
+<DocumentFragment>
+  <h1
+    class="pf-v6-c-modal-box__title pf-m-icon pf-m-info"
+    id="boxId"
+  >
+    <span
+      class="pf-v6-c-modal-box__title-icon"
+    >
+      <svg
+        aria-hidden="true"
+        class="pf-v6-svg"
+        fill="currentColor"
+        height="1em"
+        role="img"
+        viewBox="0 0 32 32"
+        width="1em"
+      >
+        <path
+          d="M16 1C7.729 1 1 7.729 1 16s6.729 15 15 15 15-6.729 15-15S24.271 1 16 1Zm1.5 22a1.5 1.5 0 1 1-3 0v-5.157l-.188.04a1.5 1.5 0 0 1-.625-2.934l1.956-.416c.112-.024.223-.032.333-.03l.024-.002a1.5 1.5 0 0 1 1.5 1.5v7Zm-.08-12.58c-.38.37-.89.58-1.42.58a1.998 1.998 0 0 1-1.851-2.76c.051-.13.11-.24.19-.35.07-.11.15-.21.25-.3.74-.75 2.08-.75 2.83 0 .09.09.17.19.24.3.08.11.14.22.189.35.05.12.09.24.11.37.03.13.04.26.04.39 0 .53-.21 1.04-.58 1.42Z"
+        />
+      </svg>
+    </span>
+    <span
+      class="pf-v6-screen-reader"
+    >
+      Info alert:
+    </span>
+    <span
+      class="pf-v6-c-modal-box__title-text"
+    >
+      Test Modal Box info
+    </span>
+  </h1>
+</DocumentFragment>
+`;
+
+exports[`ModalBoxTitle success variant 1`] = `
+<DocumentFragment>
+  <h1
+    class="pf-v6-c-modal-box__title pf-m-icon pf-m-success"
+    id="boxId"
+  >
+    <span
+      class="pf-v6-c-modal-box__title-icon"
+    >
+      <svg
+        aria-hidden="true"
+        class="pf-v6-svg"
+        fill="currentColor"
+        height="1em"
+        role="img"
+        viewBox="0 0 32 32"
+        width="1em"
+      >
+        <path
+          d="M16 1C7.729 1 1 7.729 1 16s6.729 15 15 15 15-6.729 15-15S24.271 1 16 1Zm7.795 11.795-8.646 8.646c-.317.317-.733.475-1.149.475s-.832-.158-1.149-.475l-4.646-4.646a1.126 1.126 0 0 1 1.591-1.591l4.205 4.205 8.205-8.205a1.126 1.126 0 0 1 1.591 1.591Z"
+        />
+      </svg>
+    </span>
+    <span
+      class="pf-v6-screen-reader"
+    >
+      Success alert:
+    </span>
+    <span
+      class="pf-v6-c-modal-box__title-text"
+    >
+      Test Modal Box success
+    </span>
+  </h1>
+</DocumentFragment>
+`;
