@@ -22,9 +22,7 @@ spec:
             - /bin/sh
             - -c
             - |
-              git clone --branch main --depth 1 --sparse https://github.com/briangallagher/data-strat-poc.git /app-src
-              cd /app-src
-              git sparse-checkout set src/registry src/registry-ui/dist
+              git clone --branch main --depth 1 https://github.com/briangallagher/data-strat-poc.git /app-src
           volumeMounts:
             - name: app-source
               mountPath: /app-src
