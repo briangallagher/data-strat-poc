@@ -244,15 +244,24 @@ export function TraceDetailPage() {
           </Card>
 
           <Card style={{ marginTop: '1rem' }}>
-            <CardTitle>External Links</CardTitle>
+            <CardTitle>MLflow Trace</CardTitle>
             <CardBody>
               <DescriptionList isCompact>
                 <DescriptionListGroup>
-                  <DescriptionListTerm>MLflow Trace</DescriptionListTerm>
+                  <DescriptionListTerm>Trace ID</DescriptionListTerm>
                   <DescriptionListDescription>
-                    <a href={trace.mlflow_url} target="_blank" rel="noopener noreferrer">
-                      View in MLflow UI →
+                    <code style={{ fontSize: '0.8em' }}>{trace.trace_id}</code>
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>View in MLflow</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    <a href="https://rhods-dashboard-redhat-ods-applications.apps.dev.aip-ft.rh-ods.com" target="_blank" rel="noopener noreferrer">
+                      Open RHOAI Dashboard
                     </a>
+                    <div style={{ fontSize: '0.85em', color: '#6a6e73', marginTop: '0.25rem' }}>
+                      Navigate: Projects → data-strat-poc → Experiments → underwriter-chat → Traces
+                    </div>
                   </DescriptionListDescription>
                 </DescriptionListGroup>
               </DescriptionList>
