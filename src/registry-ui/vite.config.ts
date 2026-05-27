@@ -7,8 +7,9 @@ export default defineConfig({
     port: 3001,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'https://doc-registry-data-strat-poc.apps.dev.aip-ft.rh-ods.com',
         changeOrigin: true,
+        secure: false,
       },
     },
   },

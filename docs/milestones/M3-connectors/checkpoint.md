@@ -88,6 +88,32 @@
 | PG-033 | No discovery/sync process | Separate KFP pipeline or cron job |
 | PG-034 | Manifest not treated as versioned record | Version and store per `pipeline_run_id` |
 | PG-035 | Connector ABC not split into Fetcher/Discoverer | Refactor when discovery workflow lands |
+| PG-036 | Registry models "Document" not generic "Dataset" | Generalise to Dataset with type discrimination (document, table, feature_set, model) when Scenario A or broader use cases arrive. See Option C below. |
+| PG-037 | Registry UI lacks registration form | Add "Register Document" page with form fields for manual registration via the UI (M5+) |
+| PG-038 | Registry UI lacks discovery/re-scan trigger | Add "Scan Source" button on collection detail page to trigger discovery workflow (M5+, depends on PG-033) |
+
+| PG-039 | PVC not supported as staging surface | Design A uses S3 exclusively for staging; some users may need PVC-based staging (air-gapped, no object store) | Support PVC as alternative staging surface (configurable: S3 or PVC) | Add `staging_type` param (s3 or pvc); parse_and_chunk already has PVC fallback path | Open |
+
+**Design A — S3 as Sole Staging Surface:**
+
+The pipeline flow is: `acquire_documents` fetches from remote sources → writes to S3 staging → `parse_and_chunk` downloads from S3 staging → processes → writes JSONL chunks to S3 → `ingest_to_milvus` reads chunks from S3 → embeds → writes to Milvus. S3 (MinIO) is the handoff surface between all steps. This makes the Marquez lineage graph fully connected (same S3 dataset node is output of acquire and input of parse). PVC is not used in the pipeline flow. If PVC-based staging is needed (air-gapped environments, no object store), it can be added as an alternative — the fallback path exists in `parse_and_chunk` (PG-039).
+
+**Document Lifecycle (Register → Build → Acquire):**
+
+1. **Register** — declare existence. "This document exists at this URL with this metadata." No data moves.
+2. **Build Collection** — declare intent. "I want these documents queryable together in this Milvus collection." No data moves.
+3. **Pipeline run (Acquire)** — execute. Bytes flow from remote → S3 staging → parsed → embedded → Milvus. This is when data actually moves into the cluster.
+
+**Option C — Document to Dataset Generalisation (M5+):**
+
+The registry currently models "Documents" (PDFs, DOCX, HTML) with document-specific fields (`page_count`, `file_format`, `effective_date`, `jurisdiction`). For broader RHOAI use, the registry should generalise to "Dataset" — a term aligned with OpenLineage and the ET team's registry — with a `type` field discriminating between document, table, feature_set, model, etc. Document-specific metadata would move to a flexible JSONB column. This refactoring is deferred until Scenario A or cross-scenario use cases require it. The current Document model is correct and sufficient for Scenario B.
+
+**UI Enhancements (M5+):**
+- Register Document page (form: name, source_system, source_url, document_type, LOB, jurisdiction, effective_date, collection assignment)
+- "Scan Source" button on Collection Detail (triggers discovery workflow)
+- Bulk upload/import from CSV or manifest file via UI
+- Document versioning UI (view version history, mark superseded)
+- Inline metadata editing on Document Detail page
 
 ---
 

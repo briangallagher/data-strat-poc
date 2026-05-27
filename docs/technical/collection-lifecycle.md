@@ -4,6 +4,48 @@
 
 A collection is a logical grouping of documents that maps 1:1 to a Milvus vector collection. Collections have an explicit lifecycle — they are created, populated with documents, processed by pipelines, and kept current through re-runs. This doc covers how collections are defined, built, processed, and maintained.
 
+## The Three-Step Lifecycle
+
+| Step | What Happens | Data Movement |
+|------|-------------|---------------|
+| **1. Register** | Declare a document's existence in the system. Store its identity (`doc_id`), source URL, metadata. | None — this is just metadata. The document stays in the remote system. |
+| **2. Build Collection** | Assign registered documents to a collection. Declare intent to query them together. | None — this is just membership assignment in the registry. |
+| **3. Pipeline Run (Acquire)** | Execute the ingest workflow. Bytes flow from remote to cluster to Milvus. | Remote → S3 staging → parsed → embedded → Milvus vectors |
+
+Nothing moves until step 3. Registration and collection building are declarations of existence and intent. The pipeline is when data actually enters the cluster.
+
+## Data Flow (Design A: S3 as Staging Surface)
+
+```
+Remote Sources                         Cluster (MinIO/S3)                    Vector Store
+─────────────────                      ──────────────────                    ────────────
+SharePoint / S3 / Confluence           
+        │                              
+        │ acquire_documents            
+        │ (connector fetches)          
+        ▼                              
+                                       staging/<collection>/
+                                         ├── doc1.pdf
+                                         ├── doc2.pdf
+                                         └── manifest.json
+                                              │
+                                              │ parse_and_chunk
+                                              │ (downloads from S3, Docling parses)
+                                              ▼
+                                       chunks/<collection>/
+                                         ├── doc1.jsonl
+                                         └── doc2.jsonl
+                                              │
+                                              │ ingest_to_milvus
+                                              │ (embed + insert)
+                                              ▼
+                                                                             Milvus: <collection>
+                                                                               └── vectors with
+                                                                                   per-doc metadata
+```
+
+S3 is the sole staging surface. All three pipeline steps read/write via S3. PVC is not used (see PG-039 for future PVC option).
+
 ## What a Collection Is
 
 A collection is a named container in the registry that groups documents for a specific retrieval purpose:
