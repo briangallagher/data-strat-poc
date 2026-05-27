@@ -34,7 +34,12 @@ export function DocumentDetailPage() {
 
   return (
     <PageSection>
-      <Content component="h1">{doc.doc_id}</Content>
+      <Content component="h1">
+        {doc.doc_id}
+        <Link to={`/documents/${doc.doc_id}/provenance`} style={{ marginLeft: '1rem', fontSize: '0.6em' }}>
+          View Full Provenance →
+        </Link>
+      </Content>
       <Content component="p">{doc.name}</Content>
 
       <Grid hasGutter>

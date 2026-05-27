@@ -6,7 +6,11 @@ import logging
 from datetime import datetime, timezone
 from typing import Annotated
 
+from pathlib import Path
+
 from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -41,14 +45,22 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Document Registry",
-    description="Canonical identity and collection membership for the Data Strategy POC",
-    version="0.1.0",
+    description="Canonical identity, collection membership, and provenance federation for the Data Strategy POC",
+    version="0.2.0",
 )
 
 
 @app.on_event("startup")
 def startup():
     init_db()
+
+
+# Mount provenance federation router (M4)
+try:
+    from .provenance import router as provenance_router
+    app.include_router(provenance_router)
+except ImportError:
+    logger.warning("Provenance module not available — federation endpoints disabled")
 
 
 DbSession = Annotated[Session, Depends(get_db)]
@@ -523,3 +535,20 @@ def remove_from_collection(name: str, doc_id: str, db: DbSession):
     db.delete(link)
     db.commit()
     return {"removed": doc_id, "collection": name}
+
+
+# --- Static UI Serving ---
+
+_UI_DIST = Path(__file__).parent.parent / "registry-ui" / "dist"
+if _UI_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=str(_UI_DIST / "assets")), name="ui-assets")
+
+    @app.get("/{path:path}")
+    async def serve_ui(path: str):
+        """Serve the SPA — all non-API routes fall through to index.html."""
+        file_path = _UI_DIST / path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(_UI_DIST / "index.html"))
+else:
+    logger.warning(f"UI dist not found at {_UI_DIST} — static serving disabled")

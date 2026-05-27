@@ -24,7 +24,7 @@ spec:
             - |
               git clone --branch main --depth 1 --filter=blob:limit=50k --sparse https://github.com/briangallagher/data-strat-poc.git /app-src
               cd /app-src
-              git sparse-checkout set src/registry
+              git sparse-checkout set src/registry src/registry-ui/dist
           volumeMounts:
             - name: app-source
               mountPath: /app-src

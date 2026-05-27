@@ -17,6 +17,9 @@ import { DocumentDetailPage } from './pages/DocumentDetailPage';
 import { CollectionsPage } from './pages/CollectionsPage';
 import { CollectionDetailPage } from './pages/CollectionDetailPage';
 import { CreateCollectionPage } from './pages/CreateCollectionPage';
+import { QueryTracesPage } from './pages/QueryTracesPage';
+import { TraceDetailPage } from './pages/TraceDetailPage';
+import { DocumentProvenancePage } from './pages/DocumentProvenancePage';
 
 function AppNav() {
   const location = useLocation();
@@ -29,6 +32,9 @@ function AppNav() {
         </NavItem>
         <NavItem isActive={location.pathname.startsWith('/collections')}>
           <Link to="/collections">Collections</Link>
+        </NavItem>
+        <NavItem isActive={location.pathname.startsWith('/traces')}>
+          <Link to="/traces">Queries</Link>
         </NavItem>
       </NavList>
     </Nav>
@@ -44,7 +50,7 @@ export function App() {
         </MastheadBrand>
       </MastheadMain>
       <MastheadContent>
-        <Content component="small">Data Strategy POC v2 — M3 Connectors</Content>
+        <Content component="small">Data Strategy POC v2 — M4 Query</Content>
       </MastheadContent>
     </Masthead>
   );
@@ -67,6 +73,9 @@ export function App() {
           <Route path="/collections" element={<CollectionsPage />} />
           <Route path="/collections/new" element={<CreateCollectionPage />} />
           <Route path="/collections/:name" element={<CollectionDetailPage />} />
+          <Route path="/traces" element={<QueryTracesPage />} />
+          <Route path="/traces/:traceId" element={<TraceDetailPage />} />
+          <Route path="/documents/:docId/provenance" element={<DocumentProvenancePage />} />
         </Routes>
       </Page>
     </BrowserRouter>

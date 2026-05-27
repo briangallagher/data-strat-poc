@@ -10,8 +10,8 @@ Execution plan for the Data Strategy POC v2. Each milestone builds incrementally
 | [M1: Ingest Pipeline](M1-ingest-pipeline/) | **Complete** | RayData + Docling + KFP + Milvus with Scenario B metadata | May 23-25 |
 | [M2: MLflow + Lineage](M2-mlflow/) | **Complete** | rhoai-lineage library, Marquez, MLflow, OL emission, E2E lineage graph | May 25 |
 | [M3: Connectors](M3-connectors/) | **Complete** | Document Registry + acquire_documents + 3-collection ingest (DEC-008) | May 26 |
-| [M4: Query](M4-query/) | Planned | OGX Responses API + deterministic RAG (queries `underwriting_guidelines`) | — |
-| [M5: Agentic + Hardening](M5-agentic-hardening/) | Planned | Multi-hop retrieval across all 3 collections (UC-003), RBAC, gap closure | — |
+| [M4: Query](M4-query/) | **Complete** | LangGraph + MCP + MLflow autolog + Chainlit for deterministic RAG (Workflow A); queries `underwriting_guidelines`; full answer provenance via Chain 1; Marquez graph completion; unified provenance portal | May 27 |
+| [M5: Agentic + Hardening](M5-agentic-hardening/) | Planned | OGX Responses API for agentic RAG (Workflow B), multi-hop across all 3 collections (UC-003), RBAC, gap closure | — |
 
 ## M1 Progress Detail
 

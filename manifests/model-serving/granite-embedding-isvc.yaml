@@ -1,0 +1,31 @@
+# NOT DEPLOYED — PG-018: RHOAI 3.4 vLLM (v0.18.0) does not support --task=embedding.
+# The MCP server uses local sentence-transformers instead (ibm-granite/granite-embedding-125m-english).
+# Re-evaluate when RHOAI ships vLLM with embedding task support.
+#
+# apiVersion: serving.kserve.io/v1beta1
+# kind: InferenceService
+# metadata:
+#   name: granite-embedding
+#   namespace: data-strat-poc
+#   annotations:
+#     serving.kserve.io/deploymentMode: RawDeployment
+#   labels:
+#     opendatahub.io/dashboard: "true"
+# spec:
+#   predictor:
+#     model:
+#       modelFormat:
+#         name: vLLM
+#       runtime: vllm-cuda-runtime
+#       storageUri: hf://ibm-granite/granite-embedding-125m-english
+#       args:
+#       - --task=embedding
+#       - --max-model-len=512
+#       - --tensor-parallel-size=1
+#     resources:
+#       limits:
+#         nvidia.com/gpu: "1"
+#       requests:
+#         cpu: "2"
+#         memory: 8Gi
+#         nvidia.com/gpu: "1"

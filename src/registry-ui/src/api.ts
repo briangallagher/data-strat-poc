@@ -55,6 +55,49 @@ export interface LineageInfo {
   consumed_by: Record<string, unknown>[];
 }
 
+export interface TraceChunk {
+  doc_id: string;
+  chunk_index: number;
+  pipeline_run_id: string;
+  text_preview: string;
+  score: number;
+}
+
+export interface TraceSummary {
+  trace_id: string;
+  timestamp: string;
+  question: string;
+  answer_preview: string;
+  collection: string;
+  chunks: TraceChunk[];
+  doc_ids_cited: string[];
+}
+
+export interface MarquezLink {
+  job_name: string;
+  run_id: string;
+  namespace: string;
+  url: string;
+}
+
+export interface DocumentProvenance {
+  doc_id: string;
+  name: string;
+  source_url: string;
+  collections: string[];
+  pipeline_run_ids: string[];
+  marquez_links: MarquezLink[];
+  recent_query_traces: TraceSummary[];
+}
+
+export interface CollectionProvenance {
+  collection_name: string;
+  document_count: number;
+  downstream_apps: string[];
+  query_count: number;
+  marquez_jobs: MarquezLink[];
+}
+
 async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) {
@@ -108,5 +151,17 @@ export const api = {
     return fetchJSON(`${BASE}/collections/${collectionName}/documents/${docId}`, {
       method: 'DELETE',
     });
+  },
+
+  getDocumentProvenance(docId: string): Promise<DocumentProvenance> {
+    return fetchJSON(`${BASE}/provenance/document/${docId}`);
+  },
+
+  getTraceProvenance(traceId: string): Promise<Record<string, unknown>> {
+    return fetchJSON(`${BASE}/provenance/trace/${traceId}`);
+  },
+
+  getCollectionProvenance(collectionName: string): Promise<CollectionProvenance> {
+    return fetchJSON(`${BASE}/provenance/collection/${collectionName}`);
   },
 };

@@ -1,0 +1,12 @@
+langgraph
+langchain
+langchain-openai
+langchain-mcp-adapters
+fastmcp
+pymilvus
+sentence-transformers
+mlflow
+mlflow-tracing
+chainlit
+python-dotenv
+httpx
