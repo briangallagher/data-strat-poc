@@ -156,6 +156,8 @@ def _enrich_trace_metadata_from_search(search_metadata: dict, chunks_raw: str = 
                             "pipeline_run_id": c.get("pipeline_run_id", ""),
                             "score": c.get("score", 0),
                             "text_preview": (c.get("text", "") or "")[:150],
+                            "section_path": c.get("section_path", ""),
+                            "page_numbers": c.get("page_numbers", ""),
                         })
                     tags["chunks_detail"] = json.dumps(chunk_summaries)
             except (json.JSONDecodeError, TypeError):

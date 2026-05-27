@@ -81,6 +81,8 @@ class ChunkDetail(BaseModel):
     pipeline_run_id: str
     score: float
     text_preview: str
+    section_path: str = ""
+    page_numbers: str = ""
 
 
 class TraceSummary(BaseModel):
@@ -464,6 +466,8 @@ def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[Tra
                         pipeline_run_id=c.get("pipeline_run_id", ""),
                         score=c.get("score", 0),
                         text_preview=c.get("text_preview", ""),
+                        section_path=c.get("section_path", ""),
+                        page_numbers=c.get("page_numbers", ""),
                     ))
                 if not doc_ids_cited:
                     doc_ids_cited = list(set(c.doc_id for c in chunks))

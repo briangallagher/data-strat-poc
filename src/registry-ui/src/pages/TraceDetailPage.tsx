@@ -25,6 +25,8 @@ interface ChunkDetail {
   pipeline_run_id: string;
   score: number;
   text_preview: string;
+  section_path: string;
+  page_numbers: string;
 }
 
 interface TraceProvenance {
@@ -137,10 +139,10 @@ export function TraceDetailPage() {
                   <Thead>
                     <Tr>
                       <Th>Document</Th>
+                      <Th>Page</Th>
                       <Th>Section</Th>
                       <Th>Relevance</Th>
-                      <Th>Text Preview</Th>
-                      <Th>Pipeline Run</Th>
+                      <Th>Parsed Text (what the AI received)</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
@@ -151,12 +153,14 @@ export function TraceDetailPage() {
                             <strong>{chunk.doc_id}</strong>
                           </Link>
                         </Td>
-                        <Td>#{chunk.chunk_index}</Td>
+                        <Td>{chunk.page_numbers || '-'}</Td>
+                        <Td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {chunk.section_path || '-'}
+                        </Td>
                         <Td>{chunk.score.toFixed(4)}</Td>
-                        <Td style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <Td style={{ maxWidth: '350px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85em', color: '#6a6e73' }}>
                           {chunk.text_preview}
                         </Td>
-                        <Td><code>{chunk.pipeline_run_id.slice(0, 8)}...</code></Td>
                       </Tr>
                     ))}
                   </Tbody>
