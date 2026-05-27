@@ -97,12 +97,13 @@ async def on_message(message: cl.Message):
 
     msg = None
     search_metadata = {}
+    chunks_raw = ""
     answer_text = ""
 
     async for event in agent.astream(input=input_data, config=config, stream_mode="updates"):
         for node_name, node_output in event.items():
             if node_name == "retrieve":
-                chunks_text = node_output.get("retrieved_chunks", "")
+                chunks_raw = node_output.get("retrieved_chunks", "")
                 search_metadata = node_output.get("search_metadata", {})
                 doc_ids = search_metadata.get("doc_ids", [])
                 total = search_metadata.get("total_results", 0)
@@ -119,11 +120,11 @@ async def on_message(message: cl.Message):
                         await msg.send()
                         answer_text = content
 
-    _enrich_trace_metadata_from_search(search_metadata, answer=answer_text)
+    _enrich_trace_metadata_from_search(search_metadata, chunks_raw=chunks_raw, answer=answer_text)
 
 
-def _enrich_trace_metadata_from_search(search_metadata: dict, answer: str = ""):
-    """Add doc_ids, pipeline_run_ids, and answer preview as searchable trace tags.
+def _enrich_trace_metadata_from_search(search_metadata: dict, chunks_raw: str = "", answer: str = ""):
+    """Add doc_ids, pipeline_run_ids, chunk details, and answer preview as trace tags.
     
     Tags are not truncated by the MLflow API (unlike request_metadata values),
     so we store provenance data here for the Registry provenance portal.
@@ -142,6 +143,23 @@ def _enrich_trace_metadata_from_search(search_metadata: dict, answer: str = ""):
         }
         if answer:
             tags["answer_preview"] = answer[:500]
+
+        if chunks_raw:
+            try:
+                parsed = json.loads(chunks_raw) if isinstance(chunks_raw, str) else chunks_raw
+                if isinstance(parsed, dict):
+                    chunk_summaries = []
+                    for c in parsed.get("chunks", []):
+                        chunk_summaries.append({
+                            "doc_id": c.get("doc_id", ""),
+                            "chunk_index": c.get("chunk_index", 0),
+                            "pipeline_run_id": c.get("pipeline_run_id", ""),
+                            "score": c.get("score", 0),
+                            "text_preview": (c.get("text", "") or "")[:150],
+                        })
+                    tags["chunks_detail"] = json.dumps(chunk_summaries)
+            except (json.JSONDecodeError, TypeError):
+                pass
 
         mlflow.update_current_trace(tags=tags)
     except Exception as e:

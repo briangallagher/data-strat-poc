@@ -72,13 +72,21 @@ class TraceChunk(BaseModel):
     score: float
 
 
+class ChunkDetail(BaseModel):
+    doc_id: str
+    chunk_index: int
+    pipeline_run_id: str
+    score: float
+    text_preview: str
+
+
 class TraceSummary(BaseModel):
     trace_id: str
     timestamp: str
     question: str
     answer_preview: str
     collection: str
-    chunks: list[TraceChunk]
+    chunks: list[ChunkDetail]
     doc_ids_cited: list[str]
 
 
@@ -310,6 +318,7 @@ async def get_trace_provenance(trace_id: str):
         "answer_preview": summary.answer_preview if summary else "",
         "collection": summary.collection if summary else "",
         "doc_ids_cited": summary.doc_ids_cited if summary else [],
+        "chunks": [c.model_dump() for c in summary.chunks] if summary else [],
         "documents": doc_details,
         "mlflow_url": f"{MLFLOW_EXTERNAL_URL}/#/experiments/{trace.get('experiment_id', '')}/traces/{trace_id}",
     }
@@ -440,6 +449,24 @@ def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[Tra
             except (_json.JSONDecodeError, TypeError):
                 pass
 
+        # Parse chunk details from tag
+        chunks = []
+        chunks_json = tags.get("chunks_detail", "")
+        if chunks_json:
+            try:
+                for c in _json.loads(chunks_json):
+                    chunks.append(ChunkDetail(
+                        doc_id=c.get("doc_id", ""),
+                        chunk_index=c.get("chunk_index", 0),
+                        pipeline_run_id=c.get("pipeline_run_id", ""),
+                        score=c.get("score", 0),
+                        text_preview=c.get("text_preview", ""),
+                    ))
+                if not doc_ids_cited:
+                    doc_ids_cited = list(set(c.doc_id for c in chunks))
+            except (_json.JSONDecodeError, TypeError):
+                pass
+
         if doc_id_filter and doc_id_filter not in doc_ids_cited:
             return None
 
@@ -449,7 +476,7 @@ def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[Tra
             question=question,
             answer_preview=answer_preview,
             collection=collection,
-            chunks=[],
+            chunks=chunks,
             doc_ids_cited=doc_ids_cited,
         )
     except Exception as e:

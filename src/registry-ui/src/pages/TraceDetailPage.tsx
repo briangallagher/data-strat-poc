@@ -19,6 +19,14 @@ import {
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { api } from '../api';
 
+interface ChunkDetail {
+  doc_id: string;
+  chunk_index: number;
+  pipeline_run_id: string;
+  score: number;
+  text_preview: string;
+}
+
 interface TraceProvenance {
   trace_id: string;
   timestamp: string;
@@ -28,6 +36,7 @@ interface TraceProvenance {
   answer_preview: string;
   collection: string;
   doc_ids_cited: string[];
+  chunks: ChunkDetail[];
   documents: {
     doc_id: string;
     name: string;
@@ -85,6 +94,42 @@ export function TraceDetailPage() {
               </DescriptionList>
             </CardBody>
           </Card>
+
+          {trace.chunks && trace.chunks.length > 0 && (
+            <Card style={{ marginTop: '1rem' }}>
+              <CardTitle>Retrieved Chunks ({trace.chunks.length})</CardTitle>
+              <CardBody>
+                <Table variant="compact">
+                  <Thead>
+                    <Tr>
+                      <Th>Document</Th>
+                      <Th>Chunk</Th>
+                      <Th>Score</Th>
+                      <Th>Text Preview</Th>
+                      <Th>Pipeline Run</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {trace.chunks.map((chunk, i) => (
+                      <Tr key={i}>
+                        <Td>
+                          <Link to={`/documents/${chunk.doc_id}`}>
+                            <strong>{chunk.doc_id}</strong>
+                          </Link>
+                        </Td>
+                        <Td>#{chunk.chunk_index}</Td>
+                        <Td>{chunk.score.toFixed(4)}</Td>
+                        <Td style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {chunk.text_preview}
+                        </Td>
+                        <Td><code>{chunk.pipeline_run_id.slice(0, 8)}...</code></Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              </CardBody>
+            </Card>
+          )}
 
           {trace.documents.length > 0 && (
             <Card style={{ marginTop: '1rem' }}>
