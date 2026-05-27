@@ -95,42 +95,6 @@ export function TraceDetailPage() {
             </CardBody>
           </Card>
 
-          {trace.chunks && trace.chunks.length > 0 && (
-            <Card style={{ marginTop: '1rem' }}>
-              <CardTitle>Retrieved Chunks ({trace.chunks.length})</CardTitle>
-              <CardBody>
-                <Table variant="compact">
-                  <Thead>
-                    <Tr>
-                      <Th>Document</Th>
-                      <Th>Chunk</Th>
-                      <Th>Score</Th>
-                      <Th>Text Preview</Th>
-                      <Th>Pipeline Run</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {trace.chunks.map((chunk, i) => (
-                      <Tr key={i}>
-                        <Td>
-                          <Link to={`/documents/${chunk.doc_id}`}>
-                            <strong>{chunk.doc_id}</strong>
-                          </Link>
-                        </Td>
-                        <Td>#{chunk.chunk_index}</Td>
-                        <Td>{chunk.score.toFixed(4)}</Td>
-                        <Td style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {chunk.text_preview}
-                        </Td>
-                        <Td><code>{chunk.pipeline_run_id.slice(0, 8)}...</code></Td>
-                      </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
-              </CardBody>
-            </Card>
-          )}
-
           {trace.documents.length > 0 && (
             <Card style={{ marginTop: '1rem' }}>
               <CardTitle>Source Documents</CardTitle>
@@ -157,6 +121,42 @@ export function TraceDetailPage() {
                         <Td><Label>{doc.document_type}</Label></Td>
                         <Td>{doc.line_of_business}</Td>
                         <Td>{doc.jurisdiction}</Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              </CardBody>
+            </Card>
+          )}
+
+          {trace.chunks && trace.chunks.length > 0 && (
+            <Card style={{ marginTop: '1rem' }}>
+              <CardTitle>Document Sections ({trace.chunks.length})</CardTitle>
+              <CardBody>
+                <Table variant="compact">
+                  <Thead>
+                    <Tr>
+                      <Th>Document</Th>
+                      <Th>Section</Th>
+                      <Th>Relevance</Th>
+                      <Th>Text Preview</Th>
+                      <Th>Pipeline Run</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {trace.chunks.map((chunk, i) => (
+                      <Tr key={i}>
+                        <Td>
+                          <Link to={`/documents/${chunk.doc_id}`}>
+                            <strong>{chunk.doc_id}</strong>
+                          </Link>
+                        </Td>
+                        <Td>#{chunk.chunk_index}</Td>
+                        <Td>{chunk.score.toFixed(4)}</Td>
+                        <Td style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {chunk.text_preview}
+                        </Td>
+                        <Td><code>{chunk.pipeline_run_id.slice(0, 8)}...</code></Td>
                       </Tr>
                     ))}
                   </Tbody>
