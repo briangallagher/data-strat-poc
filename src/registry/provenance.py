@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 MARQUEZ_API_URL = os.environ.get("MARQUEZ_API_URL", "http://marquez:5000")
 MLFLOW_API_URL = os.environ.get("MLFLOW_API_URL", "https://mlflow.redhat-ods-applications.svc:8443")
+MLFLOW_EXTERNAL_URL = os.environ.get("MLFLOW_EXTERNAL_URL", "https://mlflow-ui-redhat-ods-applications.apps.dev.aip-ft.rh-ods.com")
 MLFLOW_WORKSPACE = os.environ.get("MLFLOW_WORKSPACE", "data-strat-poc")
 MLFLOW_EXPERIMENT_NAME = os.environ.get("MLFLOW_EXPERIMENT_NAME", "underwriter-chat")
 MARQUEZ_NAMESPACE = os.environ.get("MARQUEZ_NAMESPACE", "data-strat-poc")
@@ -310,7 +311,7 @@ async def get_trace_provenance(trace_id: str):
         "collection": summary.collection if summary else "",
         "doc_ids_cited": summary.doc_ids_cited if summary else [],
         "documents": doc_details,
-        "mlflow_url": f"{MLFLOW_API_URL}/#/experiments/{trace.get('experiment_id', '')}/traces/{trace_id}",
+        "mlflow_url": f"{MLFLOW_EXTERNAL_URL}/#/experiments/{trace.get('experiment_id', '')}/traces/{trace_id}",
     }
 
 
@@ -375,42 +376,65 @@ async def list_traces():
 def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[TraceSummary]:
     """Extract a TraceSummary from an MLflow trace list response."""
     try:
+        import json as _json
+
         trace_id = trace.get("request_id", "")
         timestamp = str(trace.get("timestamp_ms", ""))
         status = trace.get("status", "")
 
-        # Extract question from request_metadata
         question = ""
         answer_preview = ""
-        tags = {}
+        metadata_dict = {}
         for meta in trace.get("request_metadata", []):
-            key = meta.get("key", "")
-            value = meta.get("value", "")
-            if key == "mlflow.traceInputs":
-                try:
-                    import json
-                    inputs = json.loads(value)
-                    msgs = inputs.get("messages", [])
-                    if msgs:
-                        question = msgs[0].get("content", "")[:200]
-                except (json.JSONDecodeError, TypeError, IndexError):
-                    pass
-            elif key == "mlflow.traceOutputs":
-                try:
-                    import json
-                    outputs = json.loads(value)
-                    msgs = outputs.get("messages", [])
-                    if msgs:
-                        last = msgs[-1]
-                        answer_preview = (last.get("content", "") or "")[:300]
-                except (json.JSONDecodeError, TypeError, IndexError):
-                    pass
+            metadata_dict[meta.get("key", "")] = meta.get("value", "")
 
+        # Extract question from traceInputs
+        try:
+            inputs = _json.loads(metadata_dict.get("mlflow.traceInputs", "{}"))
+            msgs = inputs.get("messages", [])
+            if msgs:
+                question = msgs[0].get("content", "")[:200]
+        except (_json.JSONDecodeError, TypeError, IndexError):
+            pass
+
+        # Extract answer from traceOutputs — last AI message
+        try:
+            outputs = _json.loads(metadata_dict.get("mlflow.traceOutputs", "{}"))
+            msgs = outputs.get("messages", [])
+            for msg in reversed(msgs):
+                msg_type = msg.get("type", "")
+                content = msg.get("content", "")
+                if msg_type in ("ai", "AIMessage") and content:
+                    answer_preview = content[:500]
+                    break
+        except (_json.JSONDecodeError, TypeError, IndexError):
+            pass
+
+        # Extract tags (doc_ids_cited, collection_queried)
+        tags = {}
         for tag in trace.get("tags", []):
             tags[tag.get("key", "")] = tag.get("value", "")
 
         doc_ids_cited = [d for d in tags.get("doc_ids_cited", "").split(",") if d]
         collection = tags.get("collection_queried", "")
+
+        # If no tags, try to extract collection from the traceOutputs (retrieve step)
+        if not collection and not doc_ids_cited:
+            try:
+                outputs = _json.loads(metadata_dict.get("mlflow.traceOutputs", "{}"))
+                msgs = outputs.get("messages", [])
+                for msg in msgs:
+                    content = msg.get("content", "")
+                    if "retrieved_chunks" in str(outputs):
+                        rc = outputs.get("retrieved_chunks", "")
+                        if isinstance(rc, str) and rc.startswith("{"):
+                            parsed_rc = _json.loads(rc)
+                            collection = parsed_rc.get("collection", "")
+                            doc_ids_cited = list(set(
+                                c.get("doc_id", "") for c in parsed_rc.get("chunks", []) if c.get("doc_id")
+                            ))
+            except (_json.JSONDecodeError, TypeError):
+                pass
 
         if doc_id_filter and doc_id_filter not in doc_ids_cited:
             return None
