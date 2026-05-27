@@ -22,7 +22,7 @@ spec:
             - /bin/sh
             - -c
             - |
-              git clone --branch main --depth 1 --filter=blob:limit=50k --sparse https://github.com/briangallagher/data-strat-poc.git /app-src
+              git clone --branch main --depth 1 --sparse https://github.com/briangallagher/data-strat-poc.git /app-src
               cd /app-src
               git sparse-checkout set src/registry src/registry-ui/dist
           volumeMounts:
@@ -36,7 +36,7 @@ spec:
             - -c
             - |
               set -ex
-              pip install fastapi "uvicorn[standard]" sqlalchemy psycopg2-binary pydantic httpx
+              pip install fastapi "uvicorn[standard]" sqlalchemy psycopg2-binary pydantic httpx aiofiles
               ls -la /app-src/src/registry/
               cd /app-src/src
               python -c "from registry.app import app; print('Import OK')"
