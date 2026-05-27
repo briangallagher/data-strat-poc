@@ -418,6 +418,10 @@ def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[Tra
         doc_ids_cited = [d for d in tags.get("doc_ids_cited", "").split(",") if d]
         collection = tags.get("collection_queried", "")
 
+        # Answer from tag (not truncated) takes priority over traceOutputs (truncated)
+        if not answer_preview and tags.get("answer_preview"):
+            answer_preview = tags["answer_preview"]
+
         # If no tags, try to extract collection from the traceOutputs (retrieve step)
         if not collection and not doc_ids_cited:
             try:

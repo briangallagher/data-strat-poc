@@ -97,6 +97,7 @@ async def on_message(message: cl.Message):
 
     msg = None
     search_metadata = {}
+    answer_text = ""
 
     async for event in agent.astream(input=input_data, config=config, stream_mode="updates"):
         for node_name, node_output in event.items():
@@ -116,26 +117,32 @@ async def on_message(message: cl.Message):
                     if content:
                         msg = cl.Message(content=content)
                         await msg.send()
+                        answer_text = content
 
-    _enrich_trace_metadata_from_search(search_metadata)
+    _enrich_trace_metadata_from_search(search_metadata, answer=answer_text)
 
 
-def _enrich_trace_metadata_from_search(search_metadata: dict):
-    """Add doc_ids and pipeline_run_ids from search results as searchable trace tags."""
+def _enrich_trace_metadata_from_search(search_metadata: dict, answer: str = ""):
+    """Add doc_ids, pipeline_run_ids, and answer preview as searchable trace tags.
+    
+    Tags are not truncated by the MLflow API (unlike request_metadata values),
+    so we store provenance data here for the Registry provenance portal.
+    """
     try:
         doc_ids = search_metadata.get("doc_ids", [])
         pipeline_run_ids = search_metadata.get("pipeline_run_ids", [])
         collection = search_metadata.get("collection", "")
         total = search_metadata.get("total_results", 0)
 
-        if doc_ids or collection:
-            mlflow.update_current_trace(
-                tags={
-                    "doc_ids_cited": ",".join(sorted(doc_ids)),
-                    "pipeline_run_ids": ",".join(sorted(pipeline_run_ids)),
-                    "collection_queried": collection,
-                    "chunks_retrieved_count": str(total),
-                }
-            )
+        tags = {
+            "doc_ids_cited": ",".join(sorted(doc_ids)),
+            "pipeline_run_ids": ",".join(sorted(pipeline_run_ids)),
+            "collection_queried": collection,
+            "chunks_retrieved_count": str(total),
+        }
+        if answer:
+            tags["answer_preview"] = answer[:500]
+
+        mlflow.update_current_trace(tags=tags)
     except Exception as e:
         logger.warning(f"Failed to enrich trace metadata: {e}")
