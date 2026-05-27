@@ -186,19 +186,28 @@ async def _search_mlflow_traces(
         return []
 
 
-async def _get_mlflow_trace(trace_id: str) -> dict:
-    """Fetch a single MLflow trace with full span details."""
+async def _get_mlflow_trace(trace_id: str) -> Optional[dict]:
+    """Fetch a single trace by filtering the list endpoint (RHOAI MLflow lacks GET /traces/{id})."""
     client = _get_client()
     try:
+        exp_id = await _get_mlflow_experiment_id()
+        if not exp_id:
+            return None
+
         resp = await client.get(
-            f"{MLFLOW_API_URL}/api/2.0/mlflow/traces/{trace_id}",
+            f"{MLFLOW_API_URL}/api/2.0/mlflow/traces",
+            params={"experiment_ids": exp_id, "request_ids": trace_id},
             headers=_mlflow_headers(),
         )
         resp.raise_for_status()
-        return resp.json()
+        traces = resp.json().get("traces", [])
+        for t in traces:
+            if t.get("request_id") == trace_id:
+                return t
+        return None
     except Exception as e:
         logger.warning(f"MLflow trace fetch failed for {trace_id}: {e}")
-        return {}
+        return None
 
 
 # --- Provenance Endpoints ---
@@ -263,14 +272,46 @@ async def get_trace_provenance(trace_id: str):
     """
     Federated provenance for a query trace.
 
-    Returns MLflow trace detail enriched with Registry document metadata
-    and Marquez lineage links.
+    Returns trace metadata from MLflow enriched with Registry document links.
     """
     trace = await _get_mlflow_trace(trace_id)
     if not trace:
         raise HTTPException(404, f"Trace {trace_id} not found in MLflow")
 
-    return trace
+    summary = _extract_trace_summary(trace)
+
+    # Enrich with Registry document metadata for cited doc_ids
+    doc_details = []
+    if summary and summary.doc_ids_cited:
+        from .db import SessionLocal, DocumentRow
+        db = SessionLocal()
+        try:
+            for doc_id in summary.doc_ids_cited:
+                doc = db.query(DocumentRow).filter(DocumentRow.doc_id == doc_id).first()
+                if doc:
+                    doc_details.append({
+                        "doc_id": doc.doc_id,
+                        "name": doc.name,
+                        "source_url": doc.source_url,
+                        "document_type": doc.document_type,
+                        "line_of_business": doc.line_of_business,
+                        "jurisdiction": doc.jurisdiction,
+                    })
+        finally:
+            db.close()
+
+    return {
+        "trace_id": trace_id,
+        "timestamp": str(trace.get("timestamp_ms", "")),
+        "status": trace.get("status", ""),
+        "execution_time_ms": trace.get("execution_time_ms"),
+        "question": summary.question if summary else "",
+        "answer_preview": summary.answer_preview if summary else "",
+        "collection": summary.collection if summary else "",
+        "doc_ids_cited": summary.doc_ids_cited if summary else [],
+        "documents": doc_details,
+        "mlflow_url": f"{MLFLOW_API_URL}/#/experiments/{trace.get('experiment_id', '')}/traces/{trace_id}",
+    }
 
 
 @router.get("/collection/{collection_name}", response_model=CollectionProvenance)

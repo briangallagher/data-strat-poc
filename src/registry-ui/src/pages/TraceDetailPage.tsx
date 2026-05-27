@@ -14,45 +14,41 @@ import {
   DescriptionListDescription,
   Label,
   LabelGroup,
-  ExpandableSection,
   Spinner,
 } from '@patternfly/react-core';
+import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { api } from '../api';
 
-interface TraceDetail {
-  info?: {
-    request_id?: string;
-    timestamp_ms?: number;
-    status?: string;
-    execution_time_ms?: number;
-  };
-  data?: {
-    spans?: SpanDetail[];
-    request?: string;
-    response?: string;
-  };
-  tags?: Record<string, string>;
-}
-
-interface SpanDetail {
-  name: string;
-  span_type: string;
-  status: { status_code: string };
-  start_time_ns?: number;
-  end_time_ns?: number;
-  attributes?: Record<string, unknown>;
+interface TraceProvenance {
+  trace_id: string;
+  timestamp: string;
+  status: string;
+  execution_time_ms: number | null;
+  question: string;
+  answer_preview: string;
+  collection: string;
+  doc_ids_cited: string[];
+  documents: {
+    doc_id: string;
+    name: string;
+    source_url: string;
+    document_type: string;
+    line_of_business: string;
+    jurisdiction: string;
+  }[];
+  mlflow_url: string;
 }
 
 export function TraceDetailPage() {
   const { traceId } = useParams<{ traceId: string }>();
-  const [trace, setTrace] = useState<TraceDetail | null>(null);
+  const [trace, setTrace] = useState<TraceProvenance | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!traceId) return;
     api.getTraceProvenance(traceId)
-      .then((data) => setTrace(data as TraceDetail))
+      .then((data) => setTrace(data as unknown as TraceProvenance))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [traceId]);
@@ -61,15 +57,10 @@ export function TraceDetailPage() {
   if (error) return <PageSection><Content>Error: {error}</Content></PageSection>;
   if (!trace) return <PageSection><Content>Trace not found</Content></PageSection>;
 
-  const tags = trace.tags || {};
-  const docIdsCited = (tags.doc_ids_cited || '').split(',').filter(Boolean);
-  const pipelineRunIds = (tags.pipeline_run_ids || '').split(',').filter(Boolean);
-  const spans = trace.data?.spans || [];
-
   return (
     <PageSection>
       <Content component="h1">Query Trace</Content>
-      <Content component="p"><code>{traceId}</code></Content>
+      <Content component="p"><code>{trace.trace_id}</code></Content>
 
       <Grid hasGutter>
         <GridItem span={8}>
@@ -80,14 +71,14 @@ export function TraceDetailPage() {
                 <DescriptionListGroup>
                   <DescriptionListTerm>Question</DescriptionListTerm>
                   <DescriptionListDescription>
-                    <strong>{trace.data?.request || '-'}</strong>
+                    <strong>{trace.question || '-'}</strong>
                   </DescriptionListDescription>
                 </DescriptionListGroup>
                 <DescriptionListGroup>
                   <DescriptionListTerm>Answer</DescriptionListTerm>
                   <DescriptionListDescription>
                     <div style={{ whiteSpace: 'pre-wrap' }}>
-                      {trace.data?.response || '-'}
+                      {trace.answer_preview || 'Answer not captured in trace metadata'}
                     </div>
                   </DescriptionListDescription>
                 </DescriptionListGroup>
@@ -95,77 +86,89 @@ export function TraceDetailPage() {
             </CardBody>
           </Card>
 
-          <Card style={{ marginTop: '1rem' }}>
-            <CardTitle>Execution Spans ({spans.length})</CardTitle>
-            <CardBody>
-              {spans.map((span, i) => (
-                <ExpandableSection
-                  key={i}
-                  toggleText={`${span.name} (${span.span_type}) — ${span.status.status_code}`}
-                  isIndented
-                >
-                  <DescriptionList isCompact>
-                    {span.attributes && Object.entries(span.attributes)
-                      .filter(([k]) => !k.startsWith('mlflow.trace'))
-                      .slice(0, 10)
-                      .map(([k, v]) => (
-                        <DescriptionListGroup key={k}>
-                          <DescriptionListTerm>{k}</DescriptionListTerm>
-                          <DescriptionListDescription>
-                            <code style={{ fontSize: '0.85em', wordBreak: 'break-all' }}>
-                              {JSON.stringify(v).slice(0, 300)}
-                            </code>
-                          </DescriptionListDescription>
-                        </DescriptionListGroup>
-                      ))}
-                  </DescriptionList>
-                </ExpandableSection>
-              ))}
-            </CardBody>
-          </Card>
+          {trace.documents.length > 0 && (
+            <Card style={{ marginTop: '1rem' }}>
+              <CardTitle>Source Documents</CardTitle>
+              <CardBody>
+                <Table variant="compact">
+                  <Thead>
+                    <Tr>
+                      <Th>Doc ID</Th>
+                      <Th>Name</Th>
+                      <Th>Type</Th>
+                      <Th>LOB</Th>
+                      <Th>Jurisdiction</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {trace.documents.map((doc) => (
+                      <Tr key={doc.doc_id}>
+                        <Td>
+                          <Link to={`/documents/${doc.doc_id}`}>
+                            <strong>{doc.doc_id}</strong>
+                          </Link>
+                        </Td>
+                        <Td>{doc.name}</Td>
+                        <Td><Label>{doc.document_type}</Label></Td>
+                        <Td>{doc.line_of_business}</Td>
+                        <Td>{doc.jurisdiction}</Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              </CardBody>
+            </Card>
+          )}
         </GridItem>
 
         <GridItem span={4}>
           <Card>
-            <CardTitle>Provenance</CardTitle>
+            <CardTitle>Trace Info</CardTitle>
             <CardBody>
               <DescriptionList isCompact>
                 <DescriptionListGroup>
+                  <DescriptionListTerm>Status</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    <Label color={trace.status === 'OK' ? 'green' : 'red'}>
+                      {trace.status || '-'}
+                    </Label>
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Duration</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    {trace.execution_time_ms ? `${(trace.execution_time_ms / 1000).toFixed(1)}s` : '-'}
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
+                  <DescriptionListTerm>Timestamp</DescriptionListTerm>
+                  <DescriptionListDescription>
+                    {trace.timestamp
+                      ? new Date(Number(trace.timestamp)).toLocaleString()
+                      : '-'}
+                  </DescriptionListDescription>
+                </DescriptionListGroup>
+                <DescriptionListGroup>
                   <DescriptionListTerm>Collection</DescriptionListTerm>
                   <DescriptionListDescription>
-                    <Label color="blue">
-                      <Link to={`/collections/${tags.collection_queried}`}>
-                        {tags.collection_queried || '-'}
-                      </Link>
-                    </Label>
+                    {trace.collection ? (
+                      <Label color="blue">
+                        <Link to={`/collections/${trace.collection}`}>{trace.collection}</Link>
+                      </Label>
+                    ) : '-'}
                   </DescriptionListDescription>
                 </DescriptionListGroup>
                 <DescriptionListGroup>
                   <DescriptionListTerm>Documents Cited</DescriptionListTerm>
                   <DescriptionListDescription>
                     <LabelGroup>
-                      {docIdsCited.map((d) => (
+                      {trace.doc_ids_cited.map((d) => (
                         <Label key={d} color="green">
                           <Link to={`/documents/${d}`}>{d}</Link>
                         </Label>
                       ))}
-                      {docIdsCited.length === 0 && '-'}
+                      {trace.doc_ids_cited.length === 0 && '-'}
                     </LabelGroup>
-                  </DescriptionListDescription>
-                </DescriptionListGroup>
-                <DescriptionListGroup>
-                  <DescriptionListTerm>Chunks Retrieved</DescriptionListTerm>
-                  <DescriptionListDescription>
-                    {tags.chunks_retrieved_count || '-'}
-                  </DescriptionListDescription>
-                </DescriptionListGroup>
-                <DescriptionListGroup>
-                  <DescriptionListTerm>Pipeline Run IDs</DescriptionListTerm>
-                  <DescriptionListDescription>
-                    {pipelineRunIds.map((pid) => (
-                      <div key={pid}><code>{pid.slice(0, 12)}...</code></div>
-                    ))}
-                    {pipelineRunIds.length === 0 && '-'}
                   </DescriptionListDescription>
                 </DescriptionListGroup>
               </DescriptionList>
@@ -173,29 +176,15 @@ export function TraceDetailPage() {
           </Card>
 
           <Card style={{ marginTop: '1rem' }}>
-            <CardTitle>Trace Info</CardTitle>
+            <CardTitle>External Links</CardTitle>
             <CardBody>
               <DescriptionList isCompact>
                 <DescriptionListGroup>
-                  <DescriptionListTerm>Status</DescriptionListTerm>
+                  <DescriptionListTerm>MLflow Trace</DescriptionListTerm>
                   <DescriptionListDescription>
-                    <Label color={trace.info?.status === 'OK' ? 'green' : 'red'}>
-                      {trace.info?.status || '-'}
-                    </Label>
-                  </DescriptionListDescription>
-                </DescriptionListGroup>
-                <DescriptionListGroup>
-                  <DescriptionListTerm>Duration</DescriptionListTerm>
-                  <DescriptionListDescription>
-                    {trace.info?.execution_time_ms ? `${trace.info.execution_time_ms}ms` : '-'}
-                  </DescriptionListDescription>
-                </DescriptionListGroup>
-                <DescriptionListGroup>
-                  <DescriptionListTerm>Timestamp</DescriptionListTerm>
-                  <DescriptionListDescription>
-                    {trace.info?.timestamp_ms
-                      ? new Date(trace.info.timestamp_ms).toLocaleString()
-                      : '-'}
+                    <a href={trace.mlflow_url} target="_blank" rel="noopener noreferrer">
+                      View in MLflow UI →
+                    </a>
                   </DescriptionListDescription>
                 </DescriptionListGroup>
               </DescriptionList>
