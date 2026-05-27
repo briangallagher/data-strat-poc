@@ -20,8 +20,8 @@ export function QueryTracesPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.getDocumentProvenance('ug-001')
-      .then((prov) => setTraces(prov.recent_query_traces))
+    api.listTraces()
+      .then((data) => setTraces(data.traces))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);

@@ -157,6 +157,10 @@ export const api = {
     return fetchJSON(`${BASE}/provenance/document/${docId}`);
   },
 
+  listTraces(): Promise<{ traces: TraceSummary[]; total: number }> {
+    return fetchJSON(`${BASE}/provenance/traces`);
+  },
+
   getTraceProvenance(traceId: string): Promise<Record<string, unknown>> {
     return fetchJSON(`${BASE}/provenance/trace/${traceId}`);
   },

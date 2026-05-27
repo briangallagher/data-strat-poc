@@ -13,12 +13,28 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 MARQUEZ_API_URL = os.environ.get("MARQUEZ_API_URL", "http://marquez:5000")
-MLFLOW_API_URL = os.environ.get("MLFLOW_API_URL", "http://mlflow-ui-redhat-ods-applications.apps.dev.aip-ft.rh-ods.com")
+MLFLOW_API_URL = os.environ.get("MLFLOW_API_URL", "https://mlflow.redhat-ods-applications.svc:8443")
+MLFLOW_WORKSPACE = os.environ.get("MLFLOW_WORKSPACE", "data-strat-poc")
+MLFLOW_EXPERIMENT_NAME = os.environ.get("MLFLOW_EXPERIMENT_NAME", "underwriter-chat")
 MARQUEZ_NAMESPACE = os.environ.get("MARQUEZ_NAMESPACE", "data-strat-poc")
+
+SA_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
 router = APIRouter(prefix="/api/v1/provenance", tags=["provenance"])
 
 _http_client: Optional[httpx.AsyncClient] = None
+
+
+def _get_sa_token() -> str:
+    """Read the ServiceAccount token for MLflow auth."""
+    try:
+        return open(SA_TOKEN_PATH).read().strip()
+    except FileNotFoundError:
+        token = os.environ.get("MLFLOW_TRACKING_TOKEN", "")
+        if token:
+            return token
+        logger.warning("No SA token found — MLflow calls will be unauthenticated")
+        return ""
 
 
 def _get_client() -> httpx.AsyncClient:
@@ -26,6 +42,15 @@ def _get_client() -> httpx.AsyncClient:
     if _http_client is None:
         _http_client = httpx.AsyncClient(timeout=10.0, verify=False)
     return _http_client
+
+
+def _mlflow_headers() -> dict:
+    """Build auth + workspace headers for RHOAI MLflow."""
+    headers = {"X-Mlflow-Workspace": MLFLOW_WORKSPACE}
+    token = _get_sa_token()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
 
 
 # --- Response Models ---
@@ -120,21 +145,39 @@ async def _get_marquez_runs_for_job(job_name: str, namespace: str = MARQUEZ_NAME
 # --- MLflow Helpers ---
 
 
+async def _get_mlflow_experiment_id() -> str:
+    """Resolve the experiment ID for the underwriter-chat experiment."""
+    client = _get_client()
+    try:
+        resp = await client.post(
+            f"{MLFLOW_API_URL}/api/2.0/mlflow/experiments/search",
+            json={"max_results": 50},
+            headers=_mlflow_headers(),
+        )
+        resp.raise_for_status()
+        for exp in resp.json().get("experiments", []):
+            if exp.get("name") == MLFLOW_EXPERIMENT_NAME:
+                return exp["experiment_id"]
+    except Exception as e:
+        logger.warning(f"MLflow experiment search failed: {e}")
+    return ""
+
+
 async def _search_mlflow_traces(
-    experiment_name: str = "underwriter-chat",
-    filter_string: str = "",
     max_results: int = 20,
 ) -> list[dict]:
     """Search MLflow traces. Returns trace metadata."""
     client = _get_client()
     try:
-        resp = await client.post(
-            f"{MLFLOW_API_URL}/api/2.0/mlflow/traces/search",
-            json={
-                "experiment_names": [experiment_name],
-                "filter": filter_string,
-                "max_results": max_results,
-            },
+        exp_id = await _get_mlflow_experiment_id()
+        if not exp_id:
+            logger.warning("Could not resolve MLflow experiment ID")
+            return []
+
+        resp = await client.get(
+            f"{MLFLOW_API_URL}/api/2.0/mlflow/traces",
+            params={"experiment_ids": exp_id, "max_results": max_results},
+            headers=_mlflow_headers(),
         )
         resp.raise_for_status()
         return resp.json().get("traces", [])
@@ -147,7 +190,10 @@ async def _get_mlflow_trace(trace_id: str) -> dict:
     """Fetch a single MLflow trace with full span details."""
     client = _get_client()
     try:
-        resp = await client.get(f"{MLFLOW_API_URL}/api/2.0/mlflow/traces/{trace_id}")
+        resp = await client.get(
+            f"{MLFLOW_API_URL}/api/2.0/mlflow/traces/{trace_id}",
+            headers=_mlflow_headers(),
+        )
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
@@ -273,39 +319,68 @@ async def get_collection_provenance(collection_name: str):
         db.close()
 
 
-def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[TraceSummary]:
-    """Extract a TraceSummary from an MLflow trace response, optionally filtering by doc_id."""
-    try:
-        trace_id = trace.get("info", {}).get("request_id", "")
-        timestamp = trace.get("info", {}).get("timestamp_ms", "")
+@router.get("/traces")
+async def list_traces():
+    """List recent query traces from MLflow."""
+    raw_traces = await _search_mlflow_traces(max_results=50)
+    summaries = []
+    for trace in raw_traces:
+        summary = _extract_trace_summary(trace)
+        if summary:
+            summaries.append(summary)
+    return {"traces": summaries, "total": len(summaries)}
 
-        spans = trace.get("data", {}).get("spans", [])
+
+def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[TraceSummary]:
+    """Extract a TraceSummary from an MLflow trace list response."""
+    try:
+        trace_id = trace.get("request_id", "")
+        timestamp = str(trace.get("timestamp_ms", ""))
+        status = trace.get("status", "")
+
+        # Extract question from request_metadata
         question = ""
         answer_preview = ""
-        chunks = []
-        collection = ""
+        tags = {}
+        for meta in trace.get("request_metadata", []):
+            key = meta.get("key", "")
+            value = meta.get("value", "")
+            if key == "mlflow.traceInputs":
+                try:
+                    import json
+                    inputs = json.loads(value)
+                    msgs = inputs.get("messages", [])
+                    if msgs:
+                        question = msgs[0].get("content", "")[:200]
+                except (json.JSONDecodeError, TypeError, IndexError):
+                    pass
+            elif key == "mlflow.traceOutputs":
+                try:
+                    import json
+                    outputs = json.loads(value)
+                    msgs = outputs.get("messages", [])
+                    if msgs:
+                        last = msgs[-1]
+                        answer_preview = (last.get("content", "") or "")[:300]
+                except (json.JSONDecodeError, TypeError, IndexError):
+                    pass
 
-        for span in spans:
-            span_name = span.get("name", "")
-            attributes = span.get("attributes", {})
+        for tag in trace.get("tags", []):
+            tags[tag.get("key", "")] = tag.get("value", "")
 
-            if "input" in attributes and not question:
-                question = str(attributes.get("input", ""))[:200]
-            if "output" in attributes and span_name != "milvus_search":
-                answer_preview = str(attributes.get("output", ""))[:300]
-
-        doc_ids_cited = list(set(c.doc_id for c in chunks))
+        doc_ids_cited = [d for d in tags.get("doc_ids_cited", "").split(",") if d]
+        collection = tags.get("collection_queried", "")
 
         if doc_id_filter and doc_id_filter not in doc_ids_cited:
             return None
 
         return TraceSummary(
             trace_id=trace_id,
-            timestamp=str(timestamp),
+            timestamp=timestamp,
             question=question,
             answer_preview=answer_preview,
             collection=collection,
-            chunks=chunks,
+            chunks=[],
             doc_ids_cited=doc_ids_cited,
         )
     except Exception as e:
