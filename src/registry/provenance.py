@@ -16,7 +16,7 @@ MARQUEZ_API_URL = os.environ.get("MARQUEZ_API_URL", "http://marquez:5000")
 MLFLOW_API_URL = os.environ.get("MLFLOW_API_URL", "https://mlflow.redhat-ods-applications.svc:8443")
 MLFLOW_EXTERNAL_URL = os.environ.get(
     "MLFLOW_EXTERNAL_URL",
-    "https://rhods-dashboard-redhat-ods-applications.apps.dev.aip-ft.rh-ods.com/projects/data-strat-poc/experiments",
+    "https://rh-ai.apps.dev.aip-ft.rh-ods.com/mlflow",
 )
 MLFLOW_WORKSPACE = os.environ.get("MLFLOW_WORKSPACE", "data-strat-poc")
 MLFLOW_EXPERIMENT_NAME = os.environ.get("MLFLOW_EXPERIMENT_NAME", "underwriter-chat")
@@ -325,7 +325,7 @@ async def get_trace_provenance(trace_id: str):
         "doc_ids_cited": summary.doc_ids_cited if summary else [],
         "chunks": [c.model_dump() for c in summary.chunks] if summary else [],
         "documents": doc_details,
-        "mlflow_url": f"{MLFLOW_EXTERNAL_URL}/{trace.get('experiment_id', '')}/traces/{trace_id}",
+        "mlflow_url": f"{MLFLOW_EXTERNAL_URL}/#/experiments/{trace.get('experiment_id', '')}/traces?startTime=ALL&workspace={MLFLOW_WORKSPACE}&selectedEvaluationId={trace_id}",
     }
 
 
