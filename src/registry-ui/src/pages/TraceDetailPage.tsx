@@ -15,7 +15,10 @@ import {
   Label,
   LabelGroup,
   Spinner,
+  Popover,
+  Icon,
 } from '@patternfly/react-core';
+import { OutlinedQuestionCircleIcon } from '@patternfly/react-icons';
 import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { api } from '../api';
 
@@ -142,7 +145,23 @@ export function TraceDetailPage() {
                       <Th>Page</Th>
                       <Th>Section</Th>
                       <Th>Relevance</Th>
-                      <Th>Parsed Text (what the AI received)</Th>
+                      <Th>
+                        Parsed Text{' '}
+                        <Popover
+                          headerContent="What is this text?"
+                          bodyContent={
+                            <div>
+                              <p>This is the text that was fed to the AI model as context for generating the answer. It is <strong>not</strong> a verbatim excerpt from the original PDF.</p>
+                              <p style={{ marginTop: '0.5rem' }}>Documents are processed by <strong>Docling</strong>, which detects layout (columns, tables, headers) and reconstructs the text in a logical reading order. This means the text may read differently from what you see when you open the PDF, especially for multi-column layouts, tables, and cross-references.</p>
+                              <p style={{ marginTop: '0.5rem' }}>Use the <strong>Page</strong> and <strong>Section</strong> columns to locate the original passage in the source document.</p>
+                            </div>
+                          }
+                        >
+                          <Icon size="sm" style={{ cursor: 'pointer', marginLeft: '0.25rem' }}>
+                            <OutlinedQuestionCircleIcon />
+                          </Icon>
+                        </Popover>
+                      </Th>
                     </Tr>
                   </Thead>
                   <Tbody>
