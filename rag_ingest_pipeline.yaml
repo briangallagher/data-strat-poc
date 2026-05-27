@@ -6,6 +6,7 @@
 #    bypass_kueue: bool [Default: False]
 #    chunk_max_tokens: int [Default: 256.0]
 #    collection_name: str [Default: 'rag_documents']
+#    connector_type: str [Default: 's3']
 #    cpus_per_actor: int [Default: 4.0]
 #    doc_category: str [Default: '']
 #    doc_date: str [Default: '']
@@ -34,15 +35,47 @@
 #    pvc_mount_path: str [Default: '/mnt/data']
 #    pvc_name: str [Default: 'data-pvc']
 #    ray_image: str [Default: 'quay.io/rhoai-szaher/docling-ray:latest']
+#    registry_url: str [Default: 'http://doc-registry:8080']
 #    s3_bucket: str [Default: 'rag-chunks']
 #    s3_endpoint: str [Default: 'http://minio-service.default.svc.cluster.local:9000']
 #    s3_prefix: str [Default: 'chunks']
 #    s3_secret_name: str [Default: 'minio-secret']
+#    s3_staging_prefix: str [Default: 'staging']
 #    timeout_seconds: int [Default: 600.0]
 #    verbose: bool [Default: True]
 #    worker_cpus: int [Default: 8.0]
 #    worker_memory_gb: int [Default: 16.0]
 components:
+  comp-acquire-documents:
+    executorLabel: exec-acquire-documents
+    inputDefinitions:
+      parameters:
+        collection_name:
+          parameterType: STRING
+        connector_type:
+          parameterType: STRING
+        namespace:
+          parameterType: STRING
+        pipeline_run_id:
+          defaultValue: ''
+          isOptional: true
+          parameterType: STRING
+        registry_url:
+          parameterType: STRING
+        s3_bucket:
+          parameterType: STRING
+        s3_endpoint:
+          parameterType: STRING
+        s3_secret_name:
+          defaultValue: minio-secret
+          isOptional: true
+          parameterType: STRING
+        s3_staging_prefix:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
   comp-ingest-to-milvus:
     executorLabel: exec-ingest-to-milvus
     inputDefinitions:
@@ -185,6 +218,10 @@ components:
         input_path:
           description: Relative path to input PDFs under the PVC.
           parameterType: STRING
+        manifest_s3_key:
+          defaultValue: ''
+          isOptional: true
+          parameterType: STRING
         max_actors:
           defaultValue: 4.0
           description: Maximum actor pool size.
@@ -237,6 +274,10 @@ components:
           description: 'Kubernetes Secret with S3 credentials (keys: access_key, secret_key).'
           isOptional: true
           parameterType: STRING
+        s3_staging_prefix:
+          defaultValue: ''
+          isOptional: true
+          parameterType: STRING
         timeout_seconds:
           defaultValue: 600.0
           description: Per-file processing timeout.
@@ -268,6 +309,196 @@ components:
           parameterType: STRING
 deploymentSpec:
   executors:
+    exec-acquire-documents:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - acquire_documents
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'registry-sdk\
+          \ @ git+https://github.com/briangallagher/data-strat-poc.git#subdirectory=registry-sdk'\
+          \ 'rhoai-lineage @ git+https://github.com/briangallagher/rhoai-lineage.git'\
+          \ 'boto3>=1.28.0' 'requests>=2.28.0'  &&  python3 -m pip install --quiet\
+          \ --no-warn-script-location 'kfp==2.16.1' '--no-deps' 'typing-extensions>=3.7.4,<5;\
+          \ python_version<\"3.9\"' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef acquire_documents(\n    registry_url: str,\n    collection_name:\
+          \ str,\n    connector_type: str,\n    s3_endpoint: str,\n    s3_bucket:\
+          \ str,\n    s3_staging_prefix: str,\n    namespace: str,\n    s3_secret_name:\
+          \ str = \"minio-secret\",\n    pipeline_run_id: str = \"\",\n) -> str:\n\
+          \    \"\"\"Acquire documents from source systems via the Document Registry.\"\
+          \"\"\n    import json\n    import os\n    import time\n\n    import boto3\n\
+          \    import httpx\n\n    start_time = time.time()\n\n    s3_access_key =\
+          \ os.environ.get(\"S3_ACCESS_KEY\", \"minioadmin\")\n    s3_secret_key =\
+          \ os.environ.get(\"S3_SECRET_KEY\", \"minioadmin\")\n    s3 = boto3.client(\n\
+          \        \"s3\",\n        endpoint_url=s3_endpoint,\n        aws_access_key_id=s3_access_key,\n\
+          \        aws_secret_access_key=s3_secret_key,\n        region_name=\"us-east-1\"\
+          ,\n    )\n\n    try:\n        s3.head_bucket(Bucket=s3_bucket)\n    except\
+          \ Exception:\n        s3.create_bucket(Bucket=s3_bucket)\n\n    print(f\"\
+          Querying registry for collection '{collection_name}'...\")\n    registry\
+          \ = httpx.Client(base_url=registry_url, timeout=30.0)\n\n    r = registry.get(\"\
+          /api/v1/documents\", params={\n        \"collection\": collection_name,\n\
+          \        \"status\": \"active\",\n    })\n    r.raise_for_status()\n   \
+          \ docs_data = r.json()[\"documents\"]\n    print(f\"Registry returned {len(docs_data)}\
+          \ documents for '{collection_name}'\")\n\n    if not docs_data:\n      \
+          \  raise RuntimeError(f\"No active documents in registry for '{collection_name}'\"\
+          )\n\n    fetched = []\n    skipped = []\n    manifest_entries = []\n\n \
+          \   for doc in docs_data:\n        doc_id = doc[\"doc_id\"]\n        source_url\
+          \ = doc[\"source_url\"]\n        print(f\"  Fetching {doc_id}...\")\n\n\
+          \        try:\n            if connector_type == \"s3\":\n              \
+          \  # Extract the S3 key directly from the registry source_url\n        \
+          \        # Format: s3://<bucket>/<key> \u2014 the key is authoritative\n\
+          \                if source_url.startswith(\"s3://\"):\n                \
+          \    url_without_scheme = source_url[len(\"s3://\"):]\n                \
+          \    src_key = url_without_scheme.split(\"/\", 1)[1]\n                 \
+          \   filename = src_key.split(\"/\")[-1]\n                else:\n       \
+          \             filename = source_url.split(\"/\")[-1]\n                 \
+          \   src_key = f\"corpus/{collection_name}/{filename}\"\n\n             \
+          \   dest_key = f\"{s3_staging_prefix}/{filename}\"\n                try:\n\
+          \                    s3.copy_object(\n                        Bucket=s3_bucket,\n\
+          \                        CopySource={\"Bucket\": s3_bucket, \"Key\": src_key},\n\
+          \                        Key=dest_key,\n                    )\n        \
+          \        except Exception as copy_err:\n                    if \"404\" in\
+          \ str(copy_err) or \"NoSuchKey\" in str(copy_err):\n                   \
+          \     print(f\"    WARNING: {doc_id} not found at {src_key} \u2014 skipping\"\
+          )\n                        skipped.append({\"doc_id\": doc_id, \"reason\"\
+          : \"not_found\"})\n                        try:\n                      \
+          \      registry.patch(f\"/api/v1/documents/{doc_id}\", json={\"status\"\
+          : \"unavailable\"})\n                        except Exception:\n       \
+          \                     pass\n                        continue\n         \
+          \           raise\n            else:\n                filename = doc_id\
+          \ + \".html\"\n                dest_key = f\"{s3_staging_prefix}/{filename}\"\
+          \n                s3.put_object(Bucket=s3_bucket, Key=dest_key,\n      \
+          \                        Body=f\"<!-- Placeholder for {doc_id} -->\".encode())\n\
+          \n            fetched.append(doc_id)\n            manifest_entries.append({\n\
+          \                \"doc_id\": doc[\"doc_id\"],\n                \"filename\"\
+          : filename,\n                \"source_system\": doc[\"source_system\"],\n\
+          \                \"source_url\": doc[\"source_url\"],\n                \"\
+          document_type\": doc[\"document_type\"],\n                \"line_of_business\"\
+          : doc[\"line_of_business\"],\n                \"jurisdiction\": doc[\"jurisdiction\"\
+          ],\n                \"effective_date\": doc.get(\"effective_date\"),\n \
+          \               \"collections\": doc.get(\"collections\", [collection_name]),\n\
+          \            })\n            print(f\"    OK: {doc_id}\")\n\n        except\
+          \ Exception as e:\n            print(f\"    ERROR: {doc_id} \u2014 {str(e)[:100]}\"\
+          )\n            skipped.append({\"doc_id\": doc_id, \"reason\": str(e)[:100]})\n\
+          \n    if not fetched:\n        raise RuntimeError(f\"All documents failed\
+          \ to fetch for '{collection_name}'\")\n\n    manifest_key = f\"{s3_staging_prefix}/manifest.json\"\
+          \n    s3.put_object(\n        Bucket=s3_bucket, Key=manifest_key,\n    \
+          \    Body=json.dumps(manifest_entries, indent=2).encode(\"utf-8\"),\n  \
+          \      ContentType=\"application/json\",\n    )\n    print(f\"\\nManifest:\
+          \ s3://{s3_bucket}/{manifest_key} ({len(manifest_entries)} entries)\")\n\
+          \n    # OpenLineage emission\n    try:\n        from rhoai_lineage.kfp.lineage\
+          \ import kfp_lineage\n        from urllib.parse import urlparse as _urlparse\n\
+          \n        _s3_parsed = _urlparse(s3_endpoint)\n        _s3_host = _s3_parsed.hostname\
+          \ or \"minio\"\n        _s3_port = _s3_parsed.port or 9000\n\n        input_datasets\
+          \ = [\n            {\n                \"namespace\": f\"registry://{e['source_system']}\"\
+          ,\n                \"name\": e[\"doc_id\"],\n                \"inputFacets\"\
+          : {\n                    \"document_metadata\": {\n                    \
+          \    \"_producer\": \"https://github.com/rhoai-lineage\",\n            \
+          \            \"_schemaURL\": \"https://openlineage.io/spec/2-0-2/OpenLineage.json#/$defs/InputDatasetFacet\"\
+          ,\n                        \"source_url\": e.get(\"source_url\", \"\"),\n\
+          \                        \"source_system\": e.get(\"source_system\", \"\"\
+          ),\n                        \"document_type\": e.get(\"document_type\",\
+          \ \"\"),\n                        \"line_of_business\": e.get(\"line_of_business\"\
+          , \"\"),\n                        \"jurisdiction\": e.get(\"jurisdiction\"\
+          , \"\"),\n                        \"effective_date\": e.get(\"effective_date\"\
+          , \"\"),\n                        \"collection\": collection_name,\n   \
+          \                 }\n                }\n            }\n            for e\
+          \ in manifest_entries\n        ]\n        output_ds = {\n            \"\
+          namespace\": f\"s3://{_s3_host}:{_s3_port}\",\n            \"name\": f\"\
+          {s3_bucket}/{s3_staging_prefix}\",\n            \"facets\": {\n        \
+          \        \"custom_metrics\": {\n                    \"_producer\": \"https://github.com/rhoai-lineage\"\
+          ,\n                    \"_schemaURL\": \"https://openlineage.io/spec/2-0-2/OpenLineage.json#/$defs/CustomFacet\"\
+          ,\n                    \"documents_fetched\": len(fetched),\n          \
+          \          \"documents_skipped\": len(skipped),\n                    \"\
+          connector_type\": connector_type,\n                    \"collection\": collection_name,\n\
+          \                    \"duration_seconds\": round(time.time() - start_time,\
+          \ 2),\n                },\n            },\n        }\n        ol_run_facets\
+          \ = {}\n        if pipeline_run_id:\n            ol_run_facets[\"pipelineRunId\"\
+          ] = {\n                \"_producer\": \"rhoai-lineage\",\n             \
+          \   \"_schemaURL\": \"https://openlineage.io/spec/1-0-0/OpenLineage.json\"\
+          ,\n                \"id\": pipeline_run_id,\n            }\n        with\
+          \ kfp_lineage(f\"acquire_documents/{collection_name}\", inputs=input_datasets,\n\
+          \                         outputs=[output_ds], run_facets=ol_run_facets):\n\
+          \            pass\n        print(\"OpenLineage event emitted for acquire_documents\"\
+          )\n    except Exception as e:\n        print(f\"WARNING: OL emission failed\
+          \ (non-fatal): {e}\")\n\n    # MLflow tracking\n    try:\n        import\
+          \ requests as _req\n        sa_token_path = \"/var/run/secrets/kubernetes.io/serviceaccount/token\"\
+          \n        sa_ns_path = \"/var/run/secrets/kubernetes.io/serviceaccount/namespace\"\
+          \n        mlflow_url = \"https://mlflow.redhat-ods-applications.svc:8443\"\
+          \n        headers = {\"Content-Type\": \"application/json\"}\n        if\
+          \ os.path.exists(sa_token_path):\n            with open(sa_token_path) as\
+          \ f:\n                headers[\"Authorization\"] = f\"Bearer {f.read().strip()}\"\
+          \n        if os.path.exists(sa_ns_path):\n            with open(sa_ns_path)\
+          \ as f:\n                headers[\"X-Mlflow-Workspace\"] = f.read().strip()\n\
+          \n        exp_resp = _req.get(f\"{mlflow_url}/api/2.0/mlflow/experiments/get-by-name\"\
+          ,\n                            params={\"experiment_name\": \"data-strat-ingest\"\
+          },\n                            headers=headers, verify=False, timeout=10)\n\
+          \        if exp_resp.ok:\n            experiment_id = exp_resp.json().get(\"\
+          experiment\", {}).get(\"experiment_id\")\n            if experiment_id:\n\
+          \                parent_id = None\n                search_resp = _req.post(f\"\
+          {mlflow_url}/api/2.0/mlflow/runs/search\",\n                    json={\"\
+          experiment_ids\": [experiment_id],\n                          \"filter\"\
+          : f\"tags.`kfp.pipeline_run_id` = '{pipeline_run_id}'\", \"max_results\"\
+          : 1},\n                    headers=headers, verify=False, timeout=10)\n\
+          \                if search_resp.ok:\n                    runs = search_resp.json().get(\"\
+          runs\", [])\n                    if runs:\n                        parent_id\
+          \ = runs[0].get(\"info\", {}).get(\"run_id\")\n                if not parent_id:\n\
+          \                    from datetime import datetime as _dt\n            \
+          \        _run_name = f\"ingest/{collection_name}/{_dt.utcnow().strftime('%Y-%m-%d\
+          \ %H:%M')}\"\n                    cr = _req.post(f\"{mlflow_url}/api/2.0/mlflow/runs/create\"\
+          ,\n                        json={\"experiment_id\": experiment_id, \"run_name\"\
+          : _run_name,\n                              \"tags\": [{\"key\": \"kfp.pipeline_run_id\"\
+          , \"value\": pipeline_run_id},\n                                       {\"\
+          key\": \"kfp.namespace\", \"value\": namespace},\n                     \
+          \                  {\"key\": \"kfp.component\", \"value\": \"pipeline\"\
+          },\n                                       {\"key\": \"kfp.collection\"\
+          , \"value\": collection_name}]},\n                        headers=headers,\
+          \ verify=False, timeout=10)\n                    if cr.ok:\n           \
+          \             parent_id = cr.json().get(\"run\", {}).get(\"info\", {}).get(\"\
+          run_id\")\n                if parent_id:\n                    nr = _req.post(f\"\
+          {mlflow_url}/api/2.0/mlflow/runs/create\",\n                        json={\"\
+          experiment_id\": experiment_id, \"run_name\": \"acquire_documents\",\n \
+          \                             \"tags\": [{\"key\": \"mlflow.parentRunId\"\
+          , \"value\": parent_id}]},\n                        headers=headers, verify=False,\
+          \ timeout=10)\n                    if nr.ok:\n                        run_id\
+          \ = nr.json().get(\"run\", {}).get(\"info\", {}).get(\"run_id\")\n     \
+          \                   if run_id:\n                            for k, v in\
+          \ {\"pipeline_run_id\": pipeline_run_id, \"collection_name\": collection_name,\n\
+          \                                         \"connector_type\": connector_type,\
+          \ \"documents_fetched\": str(len(fetched)),\n                          \
+          \               \"documents_skipped\": str(len(skipped))}.items():\n   \
+          \                             _req.post(f\"{mlflow_url}/api/2.0/mlflow/runs/log-parameter\"\
+          ,\n                                          json={\"run_id\": run_id, \"\
+          key\": k, \"value\": v},\n                                          headers=headers,\
+          \ verify=False, timeout=5)\n                            _req.post(f\"{mlflow_url}/api/2.0/mlflow/runs/update\"\
+          ,\n                                      json={\"run_id\": run_id, \"status\"\
+          : \"FINISHED\",\n                                            \"end_time\"\
+          : int(time.time() * 1000)},\n                                      headers=headers,\
+          \ verify=False, timeout=5)\n                            print(f\"MLflow:\
+          \ logged acquire_documents under parent {pipeline_run_id}\")\n    except\
+          \ Exception as e:\n        print(f\"MLflow tracking failed (non-blocking):\
+          \ {e}\")\n\n    duration = time.time() - start_time\n    print(f\"\\n{'='\
+          \ * 60}\")\n    print(f\"ACQUIRE: {len(fetched)} fetched, {len(skipped)}\
+          \ skipped, {duration:.1f}s\")\n    print(f\"{'=' * 60}\")\n\n    return\
+          \ manifest_key\n\n"
+        image: registry.redhat.io/rhoai/odh-pipeline-runtime-datascience-cpu-py312-rhel9@sha256:f9844dc150592a9f196283b3645dda92bd80dfdb3d467fa8725b10267ea5bdbc
     exec-ingest-to-milvus:
       container:
         args:
@@ -360,11 +591,13 @@ deploymentSpec:
           \                FieldSchema(name=\"category\", dtype=DataType.VARCHAR,\
           \ max_length=128),\n                FieldSchema(name=\"subcategory\", dtype=DataType.VARCHAR,\
           \ max_length=128),\n                FieldSchema(name=\"document_date\",\
-          \ dtype=DataType.VARCHAR, max_length=32),\n                FieldSchema(\n\
-          \                    name=\"embedding\",\n                    dtype=DataType.FLOAT_VECTOR,\n\
-          \                    dim=embedding_dim,\n                ),\n          \
-          \  ],\n            description=\"RAG document chunks with traceability and\
-          \ metadata\",\n        )\n        client.create_collection(collection_name=collection_name,\
+          \ dtype=DataType.VARCHAR, max_length=32),\n                FieldSchema(name=\"\
+          section_path\", dtype=DataType.VARCHAR, max_length=1024),\n            \
+          \    FieldSchema(name=\"page_numbers\", dtype=DataType.VARCHAR, max_length=64),\n\
+          \                FieldSchema(\n                    name=\"embedding\",\n\
+          \                    dtype=DataType.FLOAT_VECTOR,\n                    dim=embedding_dim,\n\
+          \                ),\n            ],\n            description=\"RAG document\
+          \ chunks with traceability and metadata\",\n        )\n        client.create_collection(collection_name=collection_name,\
           \ schema=schema)\n\n        index_params = client.prepare_index_params()\n\
           \        if index_type == \"HNSW\":\n            index_params.add_index(\n\
           \                field_name=\"embedding\",\n                index_type=\"\
@@ -402,8 +635,10 @@ deploymentSpec:
           \                \"text\": c[\"text\"],\n                \"category\": c.get(\"\
           category\", \"\"),\n                \"subcategory\": c.get(\"subcategory\"\
           , \"\"),\n                \"document_date\": c.get(\"document_date\", \"\
-          \"),\n                \"embedding\": emb,\n            }\n            for\
-          \ c, emb in zip(batch, embeddings)\n        ]\n        client.insert(collection_name=collection_name,\
+          \"),\n                \"section_path\": c.get(\"section_path\", \"\"),\n\
+          \                \"page_numbers\": c.get(\"page_numbers\", \"\"),\n    \
+          \            \"embedding\": emb,\n            }\n            for c, emb\
+          \ in zip(batch, embeddings)\n        ]\n        client.insert(collection_name=collection_name,\
           \ data=data)\n        return len(data)\n\n    # --- Embed and insert in\
           \ streaming batches ---\n    start_time = time.time()\n    total_inserted\
           \ = 0\n    file_count = 0\n    batch = []\n    seen_files = set()\n\n  \
@@ -445,16 +680,17 @@ deploymentSpec:
           ] = {\n                \"_producer\": \"rhoai-lineage\",\n             \
           \   \"_schemaURL\": \"https://openlineage.io/spec/1-0-0/OpenLineage.json\"\
           ,\n                \"id\": pipeline_run_id,\n            }\n\n        with\
-          \ kfp_lineage(\n            \"ingest_to_milvus\",\n            inputs=[input_ds],\n\
-          \            outputs=[output_ds],\n            run_facets=ol_run_facets,\n\
-          \        ):\n            pass\n        print(\"OpenLineage COMPLETE event\
-          \ emitted for ingest_to_milvus\")\n    except Exception as e:\n        print(f\"\
-          WARNING: OpenLineage emission failed (non-fatal): {e}\")\n\n    # --- MLflow\
-          \ tracking via REST API (best-effort) ---\n    # Direct REST calls with\
-          \ SA token auth \u2014 the RHOAI MLflow Operator\n    # requires Authorization\
-          \ + X-Mlflow-Workspace headers that the vanilla\n    # mlflow client doesn't\
-          \ inject from KFP pods.\n    try:\n        class _MLflowRESTTracker:\n \
-          \           def __init__(self):\n                self._url = \"https://mlflow.redhat-ods-applications.svc:8443\"\
+          \ kfp_lineage(\n            f\"ingest_to_milvus/{collection_name}\",\n \
+          \           inputs=[input_ds],\n            outputs=[output_ds],\n     \
+          \       run_facets=ol_run_facets,\n        ):\n            pass\n      \
+          \  print(\"OpenLineage COMPLETE event emitted for ingest_to_milvus\")\n\
+          \    except Exception as e:\n        print(f\"WARNING: OpenLineage emission\
+          \ failed (non-fatal): {e}\")\n\n    # --- MLflow tracking via REST API (best-effort)\
+          \ ---\n    # Direct REST calls with SA token auth \u2014 the RHOAI MLflow\
+          \ Operator\n    # requires Authorization + X-Mlflow-Workspace headers that\
+          \ the vanilla\n    # mlflow client doesn't inject from KFP pods.\n    try:\n\
+          \        class _MLflowRESTTracker:\n            def __init__(self):\n  \
+          \              self._url = \"https://mlflow.redhat-ods-applications.svc:8443\"\
           \n                self._headers = {\"Content-Type\": \"application/json\"\
           }\n                self._run_id = None\n                self._experiment_id\
           \ = None\n                _sa_token = \"/var/run/secrets/kubernetes.io/serviceaccount/token\"\
@@ -524,15 +760,23 @@ deploymentSpec:
           , {\n                    \"run_id\": target, \"status\": status,\n     \
           \               \"end_time\": int(time.time() * 1000),\n               \
           \ })\n\n        tracker = _MLflowRESTTracker()\n        tracker.create_experiment(\"\
-          data-strat-ingest\")\n\n        parent_id = tracker.find_run_by_name(pipeline_run_id\
-          \ or \"unknown\")\n\n        if parent_id:\n            tracker.create_nested_run(\"\
-          ingest_to_milvus\", parent_id)\n        else:\n            tracker.start_run(run_name=f\"\
-          ingest-{collection_name}\")\n            print(\"MLflow: parent run not\
-          \ found, creating standalone run\")\n\n        tracker.log_param(\"pipeline_run_id\"\
-          , pipeline_run_id)\n        tracker.log_param(\"collection_name\", collection_name)\n\
-          \        tracker.log_param(\"embedding_model\", embedding_model)\n     \
-          \   tracker.log_param(\"embedding_dim\", str(embedding_dim))\n        tracker.log_param(\"\
-          index_type\", index_type)\n        tracker.log_param(\"milvus_host\", milvus_host)\n\
+          data-strat-ingest\")\n\n        parent_id = None\n        if pipeline_run_id:\n\
+          \            search_resp = req_lib.post(\n                f\"{tracker._url}/api/2.0/mlflow/runs/search\"\
+          ,\n                json={\n                    \"experiment_ids\": [tracker._experiment_id],\n\
+          \                    \"filter\": f\"tags.`kfp.pipeline_run_id` = '{pipeline_run_id}'\"\
+          ,\n                    \"max_results\": 1,\n                },\n       \
+          \         headers=tracker._headers, verify=False, timeout=10,\n        \
+          \    )\n            if search_resp.ok:\n                found = search_resp.json().get(\"\
+          runs\", [])\n                if found:\n                    parent_id =\
+          \ found[0].get(\"info\", {}).get(\"run_id\")\n\n        if parent_id:\n\
+          \            tracker.create_nested_run(\"ingest_to_milvus\", parent_id)\n\
+          \        else:\n            tracker.start_run(run_name=f\"ingest-{collection_name}\"\
+          )\n            print(\"MLflow: parent run not found, creating standalone\
+          \ run\")\n\n        tracker.log_param(\"pipeline_run_id\", pipeline_run_id)\n\
+          \        tracker.log_param(\"collection_name\", collection_name)\n     \
+          \   tracker.log_param(\"embedding_model\", embedding_model)\n        tracker.log_param(\"\
+          embedding_dim\", str(embedding_dim))\n        tracker.log_param(\"index_type\"\
+          , index_type)\n        tracker.log_param(\"milvus_host\", milvus_host)\n\
           \        tracker.log_param(\"s3_bucket\", s3_bucket)\n        tracker.log_param(\"\
           s3_prefix\", s3_prefix)\n        tracker.log_param(\"embed_batch_size\"\
           , str(embed_batch_size))\n        tracker.log_param(\"milvus_batch_size\"\
@@ -588,7 +832,8 @@ deploymentSpec:
           \ int = 0,\n    timeout_seconds: int = 600,\n    enable_profiling: bool\
           \ = False,\n    verbose: bool = True,\n    bypass_kueue: bool = False,\n\
           \    doc_category: str = \"\",\n    doc_subcategory: str = \"\",\n    doc_date:\
-          \ str = \"\",\n    pipeline_run_id: str = \"\",\n) -> str:\n    \"\"\"Parse\
+          \ str = \"\",\n    pipeline_run_id: str = \"\",\n    manifest_s3_key: str\
+          \ = \"\",\n    s3_staging_prefix: str = \"\",\n) -> str:\n    \"\"\"Parse\
           \ PDFs and write chunked JSONL files to S3.\n\n    Args:\n        pvc_name:\
           \ Name of the PVC with input PDFs.\n        pvc_mount_path: Mount path for\
           \ the PVC inside pods.\n        input_path: Relative path to input PDFs\
@@ -637,14 +882,44 @@ deploymentSpec:
           \   S3_BUCKET = os.environ.get(\"S3_BUCKET\", \"rag-chunks\")\n        S3_PREFIX\
           \ = os.environ.get(\"S3_PREFIX\", \"chunks\")\n        S3_ACCESS_KEY = os.environ.get(\"\
           S3_ACCESS_KEY\", \"\")\n        S3_SECRET_KEY = os.environ.get(\"S3_SECRET_KEY\"\
+          , \"\")\n\n        MANIFEST_S3_KEY = os.environ.get(\"MANIFEST_S3_KEY\"\
+          , \"\")\n        S3_STAGING_PREFIX = os.environ.get(\"S3_STAGING_PREFIX\"\
           , \"\")\n\n        ENABLE_PROFILING = os.environ.get(\"ENABLE_PROFILING\"\
           , \"false\").lower() == \"true\"\n        VERBOSE = os.environ.get(\"VERBOSE\"\
-          , \"true\").lower() == \"true\"\n\n        def log_verbose(msg):\n     \
-          \       \"\"\"Log message if VERBOSE is enabled.\"\"\"\n            if VERBOSE:\n\
-          \                print(f\"[VERBOSE] {msg}\", flush=True)\n\n\n        def\
-          \ _get_s3_client():\n            import boto3\n            return boto3.client(\n\
-          \                \"s3\",\n                endpoint_url=S3_ENDPOINT,\n  \
-          \              aws_access_key_id=S3_ACCESS_KEY,\n                aws_secret_access_key=S3_SECRET_KEY,\n\
+          , \"true\").lower() == \"true\"\n\n        _MANIFEST_LOOKUP: Dict[str, dict]\
+          \ = {}\n\n        def _load_manifest():\n            \"\"\"Download manifest.json\
+          \ from S3 and build a filename-keyed lookup.\"\"\"\n            global _MANIFEST_LOOKUP\n\
+          \            if not MANIFEST_S3_KEY:\n                log_verbose(\"No MANIFEST_S3_KEY\
+          \ set - using pipeline-level metadata\")\n                return\n     \
+          \       try:\n                s3 = _get_s3_client()\n                resp\
+          \ = s3.get_object(Bucket=S3_BUCKET, Key=MANIFEST_S3_KEY)\n             \
+          \   manifest_data = json.loads(resp[\"Body\"].read().decode(\"utf-8\"))\n\
+          \                for entry in manifest_data:\n                    filename\
+          \ = entry.get(\"filename\", \"\")\n                    if filename:\n  \
+          \                      _MANIFEST_LOOKUP[filename] = entry\n            \
+          \    log_verbose(f\"Loaded manifest with {len(_MANIFEST_LOOKUP)} entries\
+          \ from s3://{S3_BUCKET}/{MANIFEST_S3_KEY}\")\n            except Exception\
+          \ as e:\n                log_verbose(f\"WARNING: Failed to load manifest:\
+          \ {e} - falling back to pipeline-level metadata\")\n\n        def _get_doc_metadata(filename:\
+          \ str) -> dict:\n            \"\"\"Get per-document metadata from manifest,\
+          \ falling back to pipeline-level env vars.\"\"\"\n            entry = _MANIFEST_LOOKUP.get(filename,\
+          \ {})\n            if entry:\n                return {\n               \
+          \     \"doc_id\": entry.get(\"doc_id\", \"\"),\n                    \"category\"\
+          : entry.get(\"line_of_business\", os.environ.get(\"DOC_CATEGORY\", \"\"\
+          )),\n                    \"subcategory\": entry.get(\"document_type\", os.environ.get(\"\
+          DOC_SUBCATEGORY\", \"\")),\n                    \"document_date\": entry.get(\"\
+          effective_date\", os.environ.get(\"DOC_DATE\", \"\")),\n               \
+          \     \"jurisdiction\": entry.get(\"jurisdiction\", \"\"),\n           \
+          \     }\n            return {\n                \"doc_id\": \"\",\n     \
+          \           \"category\": os.environ.get(\"DOC_CATEGORY\", \"\"),\n    \
+          \            \"subcategory\": os.environ.get(\"DOC_SUBCATEGORY\", \"\"),\n\
+          \                \"document_date\": os.environ.get(\"DOC_DATE\", \"\"),\n\
+          \                \"jurisdiction\": \"\",\n            }\n\n        def log_verbose(msg):\n\
+          \            \"\"\"Log message if VERBOSE is enabled.\"\"\"\n          \
+          \  if VERBOSE:\n                print(f\"[VERBOSE] {msg}\", flush=True)\n\
+          \n\n        def _get_s3_client():\n            import boto3\n          \
+          \  return boto3.client(\n                \"s3\",\n                endpoint_url=S3_ENDPOINT,\n\
+          \                aws_access_key_id=S3_ACCESS_KEY,\n                aws_secret_access_key=S3_SECRET_KEY,\n\
           \                region_name=\"us-east-1\",\n            )\n\n\n       \
           \ def _ensure_bucket(s3_client, bucket):\n            try:\n           \
           \     s3_client.head_bucket(Bucket=bucket)\n            except s3_client.exceptions.ClientError:\n\
@@ -691,14 +966,21 @@ deploymentSpec:
           \        file_count += 1\n                fname = os.path.basename(file_path)\n\
           \n                try:\n                    t_start = time.time()\n    \
           \                log_verbose(f\"[Worker {worker_pid}] Processing file {file_count}:\
-          \ {fname}\")\n\n                    with open(file_path, \"rb\") as f:\n\
-          \                        file_bytes = f.read()\n                    if len(file_bytes)\
-          \ == 0:\n                        log_verbose(f\"[Worker {worker_pid}] {fname}:\
-          \ EMPTY FILE\")\n                        res_q.put((\"error\", file_path,\
-          \ 0, 0, \"File empty\"))\n                        continue\n\n         \
-          \           log_verbose(f\"[Worker {worker_pid}] {fname}: Read {len(file_bytes)}\
-          \ bytes\")\n                    stem = os.path.splitext(fname)[0]\n    \
-          \                stream = DocumentStream(name=fname, stream=io.BytesIO(file_bytes))\n\
+          \ {fname}\")\n\n                    if str(file_path).startswith(\"s3://\"\
+          ):\n                        parts = str(file_path).replace(\"s3://\", \"\
+          \").split(\"/\", 1)\n                        dl_bucket = parts[0]\n    \
+          \                    dl_key = parts[1]\n                        log_verbose(f\"\
+          [Worker {worker_pid}] Downloading from S3: {dl_key}\")\n               \
+          \         resp = s3.get_object(Bucket=dl_bucket, Key=dl_key)\n         \
+          \               file_bytes = resp[\"Body\"].read()\n                   \
+          \ else:\n                        with open(file_path, \"rb\") as f:\n  \
+          \                          file_bytes = f.read()\n                    if\
+          \ len(file_bytes) == 0:\n                        log_verbose(f\"[Worker\
+          \ {worker_pid}] {fname}: EMPTY FILE\")\n                        res_q.put((\"\
+          error\", file_path, 0, 0, \"File empty\"))\n                        continue\n\
+          \n                    log_verbose(f\"[Worker {worker_pid}] {fname}: Read\
+          \ {len(file_bytes)} bytes\")\n                    stem = os.path.splitext(fname)[0]\n\
+          \                    stream = DocumentStream(name=fname, stream=io.BytesIO(file_bytes))\n\
           \n                    t_convert_start = time.time()\n                  \
           \  result = converter.convert(stream)\n                    t_convert = time.time()\
           \ - t_convert_start\n                    log_verbose(f\"[Worker {worker_pid}]\
@@ -714,16 +996,40 @@ deploymentSpec:
           [Worker {worker_pid}] {fname}: NO CHUNKS GENERATED\")\n                \
           \        res_q.put((\"empty\", file_path, page_count, 0, \"No chunks\"))\n\
           \                        continue\n\n                    lines = []\n  \
-          \                  doc_id = stem.lower().replace(\" \", \"-\")\n       \
-          \             for idx, chunk in enumerate(chunks):\n                   \
-          \     if chunk.text.strip():\n                            lines.append(json.dumps({\n\
-          \                                \"source_file\": fname,\n             \
-          \                   \"source_document_id\": doc_id,\n                  \
-          \              \"chunk_index\": idx,\n                                \"\
-          text\": chunk.text,\n                                \"category\": os.environ.get(\"\
-          DOC_CATEGORY\", \"\"),\n                                \"subcategory\"\
-          : os.environ.get(\"DOC_SUBCATEGORY\", \"\"),\n                         \
-          \       \"document_date\": os.environ.get(\"DOC_DATE\", \"\"),\n       \
+          \                  meta = _get_doc_metadata(fname)\n                   \
+          \ doc_id = meta[\"doc_id\"] if meta[\"doc_id\"] else stem.lower().replace(\"\
+          \ \", \"-\")\n                    for idx, chunk in enumerate(chunks):\n\
+          \                        if chunk.text.strip():\n                      \
+          \      try:\n                                headings = getattr(getattr(chunk,\
+          \ \"meta\", None), \"headings\", None)\n                               \
+          \ section_path = \" > \".join(headings) if headings else \"\"\n        \
+          \                    except Exception:\n                               \
+          \ section_path = \"\"\n\n                            page_nums = set()\n\
+          \                            try:\n                                doc_items\
+          \ = getattr(getattr(chunk, \"meta\", None), \"doc_items\", None)\n     \
+          \                           if doc_items:\n                            \
+          \        for di in doc_items:\n                                        for\
+          \ prov in getattr(di, \"prov\", []):\n                                 \
+          \           pg = getattr(prov, \"page_no\", None)\n                    \
+          \                        if pg is not None:\n                          \
+          \                      page_nums.add(int(pg))\n                        \
+          \    except Exception:\n                                pass\n         \
+          \                   if page_nums:\n                                sorted_pages\
+          \ = sorted(page_nums)\n                                if len(sorted_pages)\
+          \ == 1:\n                                    page_numbers = str(sorted_pages[0])\n\
+          \                                else:\n                               \
+          \     page_numbers = f\"{sorted_pages[0]}-{sorted_pages[-1]}\"\n       \
+          \                     else:\n                                page_numbers\
+          \ = \"\"\n\n                            lines.append(json.dumps({\n    \
+          \                            \"source_file\": fname,\n                 \
+          \               \"source_document_id\": doc_id,\n                      \
+          \          \"chunk_index\": idx,\n                                \"text\"\
+          : chunk.text,\n                                \"category\": meta[\"category\"\
+          ],\n                                \"subcategory\": meta[\"subcategory\"\
+          ],\n                                \"document_date\": meta[\"document_date\"\
+          ],\n                                \"jurisdiction\": meta[\"jurisdiction\"\
+          ],\n                                \"section_path\": section_path,\n  \
+          \                              \"page_numbers\": page_numbers,\n       \
           \                     }))\n                    if not lines:\n         \
           \               log_verbose(f\"[Worker {worker_pid}] {fname}: ALL CHUNKS\
           \ EMPTY\")\n                        res_q.put((\"empty\", file_path, page_count,\
@@ -804,58 +1110,69 @@ deploymentSpec:
           \           log_verbose(f\"[Actor@{self.hostname}] Completed batch #{batch_num}\"\
           )\n                return out\n\n\n        def run():\n            print(\"\
           =\" * 80)\n            print(\"DOCLING PDF PARSING & CHUNKING JOB\")\n \
-          \           print(\"=\" * 80)\n            log_verbose(f\"Configuration:\"\
-          )\n            log_verbose(f\"  PVC mount: {PVC_MOUNT_PATH}\")\n       \
-          \     log_verbose(f\"  Input path: {INPUT_PATH}\")\n            log_verbose(f\"\
-          \  Full input path: {os.path.join(PVC_MOUNT_PATH, INPUT_PATH)}\")\n    \
-          \        log_verbose(f\"  Number of files: {NUM_FILES if NUM_FILES > 0 else\
-          \ 'all'}\")\n            log_verbose(f\"  Actors: {MIN_ACTORS} to {MAX_ACTORS}\"\
-          )\n            log_verbose(f\"  CPUs per actor: {CPUS_PER_ACTOR}\")\n  \
-          \          log_verbose(f\"  Batch size: {BATCH_SIZE}\")\n            log_verbose(f\"\
-          \  Chunk max tokens: {CHUNK_MAX_TOKENS}\")\n            log_verbose(f\"\
-          \  Tokenizer: {TOKENIZER}\")\n            log_verbose(f\"  File timeout:\
-          \ {FILE_TIMEOUT}s\")\n            log_verbose(f\"  S3 endpoint: {S3_ENDPOINT}\"\
-          )\n            log_verbose(f\"  S3 bucket: {S3_BUCKET}\")\n            log_verbose(f\"\
-          \  S3 prefix: {S3_PREFIX}\")\n            log_verbose(f\"  Verbose: {VERBOSE}\"\
-          )\n            log_verbose(f\"  Profiling: {ENABLE_PROFILING}\")\n\n   \
-          \         print(f\"\\\\nScanning for PDFs...\")\n            input_full_path\
-          \ = os.path.join(PVC_MOUNT_PATH, INPUT_PATH)\n            log_verbose(f\"\
-          Globbing: {input_full_path}/**/*.pdf\")\n            pdf_paths = sorted(glob.glob(f\"\
-          {input_full_path}/**/*.pdf\", recursive=True))\n            print(f\"  Found\
-          \ {len(pdf_paths)} total PDFs\")\n\n            if NUM_FILES > 0:\n    \
-          \            pdf_paths = pdf_paths[:NUM_FILES]\n                print(f\"\
-          \  Limited to first {NUM_FILES} PDFs\")\n\n            print(f\"  Processing\
-          \ {len(pdf_paths)} PDFs\")\n\n            if not pdf_paths:\n          \
-          \      print(\"\\\\nERROR: No PDFs found. Exiting.\")\n                log_verbose(\"\
-          Checked paths:\")\n                log_verbose(f\"  - {input_full_path}\"\
-          )\n                log_verbose(f\"  - {os.path.join(PVC_MOUNT_PATH, 'input/pdfs')}\"\
-          )\n                return\n\n            if VERBOSE and len(pdf_paths) <=\
-          \ 20:\n                log_verbose(\"PDFs to process:\")\n             \
-          \   for i, path in enumerate(pdf_paths, 1):\n                    log_verbose(f\"\
-          \  {i}. {path}\")\n\n            print(f\"\\\\nSetting up S3...\")\n   \
-          \         s3 = _get_s3_client()\n            _ensure_bucket(s3, S3_BUCKET)\n\
-          \            print(f\"  Output: s3://{S3_BUCKET}/{S3_PREFIX}/\")\n\n   \
-          \         print(f\"\\\\nPreparing Ray dataset...\")\n            target_blocks\
-          \ = MAX_ACTORS * REPARTITION_FACTOR\n            log_verbose(f\"Creating\
-          \ dataset from {len(pdf_paths)} paths\")\n            ds = ray.data.from_pandas(pd.DataFrame({\"\
-          path\": pdf_paths}))\n            log_verbose(f\"Repartitioning to {target_blocks}\
-          \ blocks ({MAX_ACTORS} actors \xD7 {REPARTITION_FACTOR})\")\n          \
-          \  ds = ds.repartition(target_blocks)\n            print(f\"  Repartitioned\
-          \ into {target_blocks} blocks for {MAX_ACTORS} max actors\")\n\n       \
-          \     print(f\"\\\\nStarting document processing...\")\n            log_verbose(f\"\
-          Creating actor pool strategy (min={MIN_ACTORS}, max={MAX_ACTORS})\")\n \
-          \           results_ds = ds.map_batches(\n                DoclingChunkProcessor,\n\
-          \                compute=ray.data.ActorPoolStrategy(\n                 \
-          \   min_size=MIN_ACTORS, max_size=MAX_ACTORS,\n                ),\n    \
-          \            batch_size=BATCH_SIZE,\n                batch_format=\"numpy\"\
-          ,\n                num_cpus=CPUS_PER_ACTOR,\n            )\n\n         \
-          \   print(f\"  Actor pool: {MIN_ACTORS}-{MAX_ACTORS} actors\")\n       \
-          \     print(f\"  Batch size: {BATCH_SIZE} files/batch\")\n            print(f\"\
-          \  Expected total batches: ~{len(pdf_paths) // BATCH_SIZE + 1}\")\n    \
-          \        print(\"\")\n\n            start_time = time.time()\n         \
-          \   success_count = error_count = timeout_count = empty_count = 0\n    \
-          \        total_pages = total_chunks = 0\n            actor_dist = {}\n \
-          \           errors_list = []\n            last_report_time = start_time\n\
+          \           print(\"=\" * 80)\n            _load_manifest()\n          \
+          \  log_verbose(f\"Configuration:\")\n            log_verbose(f\"  PVC mount:\
+          \ {PVC_MOUNT_PATH}\")\n            log_verbose(f\"  Input path: {INPUT_PATH}\"\
+          )\n            log_verbose(f\"  Full input path: {os.path.join(PVC_MOUNT_PATH,\
+          \ INPUT_PATH)}\")\n            log_verbose(f\"  Number of files: {NUM_FILES\
+          \ if NUM_FILES > 0 else 'all'}\")\n            log_verbose(f\"  Actors:\
+          \ {MIN_ACTORS} to {MAX_ACTORS}\")\n            log_verbose(f\"  CPUs per\
+          \ actor: {CPUS_PER_ACTOR}\")\n            log_verbose(f\"  Batch size: {BATCH_SIZE}\"\
+          )\n            log_verbose(f\"  Chunk max tokens: {CHUNK_MAX_TOKENS}\")\n\
+          \            log_verbose(f\"  Tokenizer: {TOKENIZER}\")\n            log_verbose(f\"\
+          \  File timeout: {FILE_TIMEOUT}s\")\n            log_verbose(f\"  S3 endpoint:\
+          \ {S3_ENDPOINT}\")\n            log_verbose(f\"  S3 bucket: {S3_BUCKET}\"\
+          )\n            log_verbose(f\"  S3 prefix: {S3_PREFIX}\")\n            log_verbose(f\"\
+          \  Verbose: {VERBOSE}\")\n            log_verbose(f\"  Profiling: {ENABLE_PROFILING}\"\
+          )\n\n            print(f\"\\\\nSetting up S3...\")\n            s3 = _get_s3_client()\n\
+          \            _ensure_bucket(s3, S3_BUCKET)\n            print(f\"  Output:\
+          \ s3://{S3_BUCKET}/{S3_PREFIX}/\")\n\n            print(f\"\\\\nAcquiring\
+          \ input files...\")\n            pdf_paths = []\n            if S3_STAGING_PREFIX:\n\
+          \                log_verbose(f\"Listing files in s3://{S3_BUCKET}/{S3_STAGING_PREFIX}/\"\
+          )\n                paginator = s3.get_paginator(\"list_objects_v2\")\n \
+          \               for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=S3_STAGING_PREFIX\
+          \ + \"/\"):\n                    for obj in page.get(\"Contents\", []):\n\
+          \                        key = obj[\"Key\"]\n                        if\
+          \ key.endswith(\"/\") or key.endswith(\"manifest.json\"):\n            \
+          \                continue\n                        pdf_paths.append(f\"\
+          s3://{S3_BUCKET}/{key}\")\n                print(f\"  Found {len(pdf_paths)}\
+          \ files in S3 staging\")\n            else:\n                log_verbose(\"\
+          No S3_STAGING_PREFIX set, falling back to PVC\")\n                input_full_path\
+          \ = os.path.join(PVC_MOUNT_PATH, INPUT_PATH)\n                log_verbose(f\"\
+          Globbing: {input_full_path}/**/*.pdf\")\n                pdf_paths = sorted(glob.glob(f\"\
+          {input_full_path}/**/*.pdf\", recursive=True))\n                print(f\"\
+          \  Found {len(pdf_paths)} PDFs on PVC\")\n\n            if NUM_FILES > 0:\n\
+          \                pdf_paths = pdf_paths[:NUM_FILES]\n                print(f\"\
+          \  Limited to first {NUM_FILES} files\")\n\n            print(f\"  Processing\
+          \ {len(pdf_paths)} files\")\n\n            if not pdf_paths:\n         \
+          \       print(\"\\\\nERROR: No files found. Exiting.\")\n              \
+          \  if S3_STAGING_PREFIX:\n                    log_verbose(f\"  Checked:\
+          \ s3://{S3_BUCKET}/{S3_STAGING_PREFIX}/\")\n                else:\n    \
+          \                log_verbose(f\"  Checked: {os.path.join(PVC_MOUNT_PATH,\
+          \ INPUT_PATH)}\")\n                return\n\n            if VERBOSE and\
+          \ len(pdf_paths) <= 20:\n                log_verbose(\"Files to process:\"\
+          )\n                for i, path in enumerate(pdf_paths, 1):\n           \
+          \         log_verbose(f\"  {i}. {path}\")\n\n            print(f\"\\\\nPreparing\
+          \ Ray dataset...\")\n            target_blocks = MAX_ACTORS * REPARTITION_FACTOR\n\
+          \            log_verbose(f\"Creating dataset from {len(pdf_paths)} paths\"\
+          )\n            ds = ray.data.from_pandas(pd.DataFrame({\"path\": pdf_paths}))\n\
+          \            log_verbose(f\"Repartitioning to {target_blocks} blocks ({MAX_ACTORS}\
+          \ actors \xD7 {REPARTITION_FACTOR})\")\n            ds = ds.repartition(target_blocks)\n\
+          \            print(f\"  Repartitioned into {target_blocks} blocks for {MAX_ACTORS}\
+          \ max actors\")\n\n            print(f\"\\\\nStarting document processing...\"\
+          )\n            log_verbose(f\"Creating actor pool strategy (min={MIN_ACTORS},\
+          \ max={MAX_ACTORS})\")\n            results_ds = ds.map_batches(\n     \
+          \           DoclingChunkProcessor,\n                compute=ray.data.ActorPoolStrategy(\n\
+          \                    min_size=MIN_ACTORS, max_size=MAX_ACTORS,\n       \
+          \         ),\n                batch_size=BATCH_SIZE,\n                batch_format=\"\
+          numpy\",\n                num_cpus=CPUS_PER_ACTOR,\n            )\n\n  \
+          \          print(f\"  Actor pool: {MIN_ACTORS}-{MAX_ACTORS} actors\")\n\
+          \            print(f\"  Batch size: {BATCH_SIZE} files/batch\")\n      \
+          \      print(f\"  Expected total batches: ~{len(pdf_paths) // BATCH_SIZE\
+          \ + 1}\")\n            print(\"\")\n\n            start_time = time.time()\n\
+          \            success_count = error_count = timeout_count = empty_count =\
+          \ 0\n            total_pages = total_chunks = 0\n            actor_dist\
+          \ = {}\n            errors_list = []\n            last_report_time = start_time\n\
           \            report_interval = 30  # Report progress every 30 seconds\n\n\
           \            batch_num = 0\n            for batch in results_ds.iter_batches(batch_size=200,\
           \ batch_format=\"numpy\"):\n                batch_num += 1\n           \
@@ -939,10 +1256,11 @@ deploymentSpec:
           \ ManagedClusterConfig, RayJob\n    from kubernetes.client import (\n  \
           \      V1PersistentVolumeClaimVolumeSource,\n        V1Volume,\n       \
           \ V1VolumeMount,\n    )\n    from ray.runtime_env import RuntimeEnv\n\n\
-          \    rayjob_name = f\"docling-chunk-{int(time.time())}\"\n\n    script_b64\
-          \ = base64.b64encode(_DOCLING_CHUNK_PROCESS_PY.encode()).decode()\n\n  \
-          \  shared_mount = V1VolumeMount(pvc_mount_path, name=\"shared-data\", read_only=True)\n\
-          \    data_volume = V1Volume(\n        name=\"shared-data\",\n        persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(\n\
+          \    _run_suffix = (pipeline_run_id or \"\")[:8] or str(int(time.time()))\n\
+          \    rayjob_name = f\"docling-{_run_suffix}\"\n\n    script_b64 = base64.b64encode(_DOCLING_CHUNK_PROCESS_PY.encode()).decode()\n\
+          \n    shared_mount = V1VolumeMount(pvc_mount_path, name=\"shared-data\"\
+          , read_only=True)\n    data_volume = V1Volume(\n        name=\"shared-data\"\
+          ,\n        persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(\n\
           \            claim_name=pvc_name,\n        ),\n    )\n\n    cluster_config\
           \ = ManagedClusterConfig(\n        head_cpu_requests=head_cpus,\n      \
           \  head_cpu_limits=head_cpus,\n        head_memory_requests=head_memory_gb,\n\
@@ -974,21 +1292,26 @@ deploymentSpec:
           \                \"VERBOSE\": \"true\" if verbose else \"false\",\n    \
           \            \"DOC_CATEGORY\": doc_category,\n                \"DOC_SUBCATEGORY\"\
           : doc_subcategory,\n                \"DOC_DATE\": doc_date,\n          \
-          \  },\n        ),\n        ttl_seconds_after_finished=300,\n    )\n\n  \
-          \  custom_api = k8s_client.CustomObjectsApi(api_client)\n    rayjob_group\
-          \ = \"ray.io\"\n    rayjob_version = \"v1\"\n    rayjob_plural = \"rayjobs\"\
-          \n\n    rayjob_cr = job._build_rayjob_cr()\n    custom_api.create_namespaced_custom_object(\n\
-          \        group=rayjob_group,\n        version=rayjob_version,\n        namespace=namespace,\n\
-          \        plural=rayjob_plural,\n        body=rayjob_cr,\n    )\n    print(f\"\
-          RayJob '{rayjob_name}' submitted via kubernetes API.\")\n\n    if bypass_kueue:\n\
-          \        rayjob_obj = custom_api.get_namespaced_custom_object(\n       \
-          \     group=rayjob_group,\n            version=rayjob_version,\n       \
-          \     namespace=namespace,\n            plural=rayjob_plural,\n        \
-          \    name=rayjob_name,\n        )\n        labels = rayjob_obj.get(\"metadata\"\
-          , {}).get(\"labels\", {})\n        if \"kueue.x-k8s.io/queue-name\" in labels:\n\
-          \            custom_api.patch_namespaced_custom_object(\n              \
-          \  group=rayjob_group,\n                version=rayjob_version,\n      \
-          \          namespace=namespace,\n                plural=rayjob_plural,\n\
+          \      \"MANIFEST_S3_KEY\": manifest_s3_key,\n                \"S3_STAGING_PREFIX\"\
+          : s3_staging_prefix,\n            },\n        ),\n        ttl_seconds_after_finished=300,\n\
+          \    )\n\n    custom_api = k8s_client.CustomObjectsApi(api_client)\n   \
+          \ rayjob_group = \"ray.io\"\n    rayjob_version = \"v1\"\n    rayjob_plural\
+          \ = \"rayjobs\"\n\n    rayjob_cr = job._build_rayjob_cr()\n    try:\n  \
+          \      custom_api.create_namespaced_custom_object(\n            group=rayjob_group,\n\
+          \            version=rayjob_version,\n            namespace=namespace,\n\
+          \            plural=rayjob_plural,\n            body=rayjob_cr,\n      \
+          \  )\n        print(f\"RayJob '{rayjob_name}' submitted via kubernetes API.\"\
+          )\n    except k8s_client.exceptions.ApiException as e:\n        if e.status\
+          \ == 409:\n            print(f\"RayJob '{rayjob_name}' already exists -\
+          \ adopting existing job.\")\n        else:\n            raise\n\n    if\
+          \ bypass_kueue:\n        rayjob_obj = custom_api.get_namespaced_custom_object(\n\
+          \            group=rayjob_group,\n            version=rayjob_version,\n\
+          \            namespace=namespace,\n            plural=rayjob_plural,\n \
+          \           name=rayjob_name,\n        )\n        labels = rayjob_obj.get(\"\
+          metadata\", {}).get(\"labels\", {})\n        if \"kueue.x-k8s.io/queue-name\"\
+          \ in labels:\n            custom_api.patch_namespaced_custom_object(\n \
+          \               group=rayjob_group,\n                version=rayjob_version,\n\
+          \                namespace=namespace,\n                plural=rayjob_plural,\n\
           \                name=rayjob_name,\n                body={\"metadata\":\
           \ {\"labels\": {\"kueue.x-k8s.io/queue-name\": None}}},\n            )\n\
           \            print(f\"Removed kueue.x-k8s.io/queue-name label from RayJob\
@@ -1050,14 +1373,17 @@ deploymentSpec:
           \ import urlparse as _urlparse\n\n        duration_seconds = time.time()\
           \ - start_time\n        _s3_parsed = _urlparse(s3_endpoint)\n        _s3_host\
           \ = _s3_parsed.hostname or \"minio\"\n        _s3_port = _s3_parsed.port\
-          \ or 9000\n\n        input_ds = {\n            \"namespace\": f\"pvc://{namespace}\"\
-          ,\n            \"name\": f\"{pvc_name}/{input_path}\",\n        }\n    \
-          \    output_ns, output_name = s3_dataset(\n            bucket=s3_bucket,\
-          \ path=s3_prefix, host=_s3_host, port=_s3_port,\n        )\n        output_ds\
-          \ = {\n            \"namespace\": output_ns,\n            \"name\": output_name,\n\
-          \            \"facets\": {\n                \"custom_metrics\": {\n    \
-          \                \"_producer\": \"https://github.com/rhoai-lineage\",\n\
-          \                    \"_schemaURL\": \"https://openlineage.io/spec/2-0-2/OpenLineage.json#/$defs/CustomFacet\"\
+          \ or 9000\n\n        if s3_staging_prefix:\n            input_ds = {\n \
+          \               \"namespace\": f\"s3://{_s3_host}:{_s3_port}\",\n      \
+          \          \"name\": f\"{s3_bucket}/{s3_staging_prefix}\",\n           \
+          \ }\n        else:\n            input_ds = {\n                \"namespace\"\
+          : f\"pvc://{namespace}\",\n                \"name\": f\"{pvc_name}/{input_path}\"\
+          ,\n            }\n        output_ns, output_name = s3_dataset(\n       \
+          \     bucket=s3_bucket, path=s3_prefix, host=_s3_host, port=_s3_port,\n\
+          \        )\n        output_ds = {\n            \"namespace\": output_ns,\n\
+          \            \"name\": output_name,\n            \"facets\": {\n       \
+          \         \"custom_metrics\": {\n                    \"_producer\": \"https://github.com/rhoai-lineage\"\
+          ,\n                    \"_schemaURL\": \"https://openlineage.io/spec/2-0-2/OpenLineage.json#/$defs/CustomFacet\"\
           ,\n                    \"num_files\": num_files,\n                    \"\
           chunk_max_tokens\": chunk_max_tokens,\n                    \"tokenizer\"\
           : tokenizer,\n                    \"num_workers\": num_workers,\n      \
@@ -1067,18 +1393,19 @@ deploymentSpec:
           , \"\")\n        if _pipeline_run_id:\n            ol_run_facets[\"pipelineRunId\"\
           ] = {\n                \"_producer\": \"rhoai-lineage\",\n             \
           \   \"_schemaURL\": \"https://openlineage.io/spec/1-0-0/OpenLineage.json\"\
-          ,\n                \"id\": _pipeline_run_id,\n            }\n\n        with\
-          \ kfp_lineage(\n            \"parse_and_chunk\",\n            inputs=[input_ds],\n\
-          \            outputs=[output_ds],\n            run_facets=ol_run_facets,\n\
-          \        ):\n            pass\n        print(\"OpenLineage COMPLETE event\
-          \ emitted for parse_and_chunk\")\n    except Exception as e:\n        print(f\"\
-          WARNING: OpenLineage emission failed (non-fatal): {e}\")\n\n    # --- MLflow\
-          \ tracking via REST API (best-effort) ---\n    # Direct REST calls with\
-          \ SA token auth \u2014 the RHOAI MLflow Operator\n    # requires Authorization\
-          \ + X-Mlflow-Workspace headers that the vanilla\n    # mlflow client doesn't\
-          \ inject from KFP pods.\n    try:\n        import requests as _req\n\n \
-          \       class _MLflowRESTTracker:\n            def __init__(self):\n   \
-          \             self._url = \"https://mlflow.redhat-ods-applications.svc:8443\"\
+          ,\n                \"id\": _pipeline_run_id,\n            }\n\n        _collection\
+          \ = s3_staging_prefix.split(\"/\")[-1] if s3_staging_prefix else \"unknown\"\
+          \n        with kfp_lineage(\n            f\"parse_and_chunk/{_collection}\"\
+          ,\n            inputs=[input_ds],\n            outputs=[output_ds],\n  \
+          \          run_facets=ol_run_facets,\n        ):\n            pass\n   \
+          \     print(\"OpenLineage COMPLETE event emitted for parse_and_chunk\")\n\
+          \    except Exception as e:\n        print(f\"WARNING: OpenLineage emission\
+          \ failed (non-fatal): {e}\")\n\n    # --- MLflow tracking via REST API (best-effort)\
+          \ ---\n    # Direct REST calls with SA token auth \u2014 the RHOAI MLflow\
+          \ Operator\n    # requires Authorization + X-Mlflow-Workspace headers that\
+          \ the vanilla\n    # mlflow client doesn't inject from KFP pods.\n    try:\n\
+          \        import requests as _req\n\n        class _MLflowRESTTracker:\n\
+          \            def __init__(self):\n                self._url = \"https://mlflow.redhat-ods-applications.svc:8443\"\
           \n                self._headers = {\"Content-Type\": \"application/json\"\
           }\n                self._run_id = None\n                self._experiment_id\
           \ = None\n                _sa_token = \"/var/run/secrets/kubernetes.io/serviceaccount/token\"\
@@ -1149,17 +1476,26 @@ deploymentSpec:
           \               \"end_time\": int(time.time() * 1000),\n               \
           \ })\n\n        duration_seconds = time.time() - start_time\n        tracker\
           \ = _MLflowRESTTracker()\n        tracker.create_experiment(\"data-strat-ingest\"\
-          )\n\n        parent_id = tracker.create_parent_run(\n            run_name=pipeline_run_id\
-          \ or \"unknown\",\n            tags={\n                \"kfp.pipeline_run_id\"\
-          : pipeline_run_id or \"unknown\",\n                \"kfp.namespace\": namespace,\n\
-          \                \"kfp.component\": \"pipeline\",\n            },\n    \
-          \    )\n\n        tracker.create_nested_run(\"parse_and_chunk\", parent_id)\n\
-          \        tracker.log_param(\"pipeline_run_id\", pipeline_run_id or \"unknown\"\
-          )\n        tracker.log_param(\"num_files\", str(num_files))\n        tracker.log_param(\"\
-          chunk_max_tokens\", str(chunk_max_tokens))\n        tracker.log_param(\"\
-          embedding_model\", tokenizer)\n        tracker.log_param(\"num_workers\"\
-          , str(num_workers))\n        tracker.log_param(\"worker_cpus\", str(worker_cpus))\n\
-          \        tracker.log_param(\"worker_memory_gb\", str(worker_memory_gb))\n\
+          )\n\n        parent_id = None\n        if pipeline_run_id:\n           \
+          \ search_resp = _req.post(\n                f\"{tracker._url}/api/2.0/mlflow/runs/search\"\
+          ,\n                json={\n                    \"experiment_ids\": [tracker._experiment_id],\n\
+          \                    \"filter\": f\"tags.`kfp.pipeline_run_id` = '{pipeline_run_id}'\"\
+          ,\n                    \"max_results\": 1,\n                },\n       \
+          \         headers=tracker._headers, verify=False, timeout=10,\n        \
+          \    )\n            if search_resp.ok:\n                found = search_resp.json().get(\"\
+          runs\", [])\n                if found:\n                    parent_id =\
+          \ found[0].get(\"info\", {}).get(\"run_id\")\n\n        if not parent_id:\n\
+          \            parent_id = tracker.create_parent_run(\n                run_name=pipeline_run_id\
+          \ or \"unknown\",\n                tags={\n                    \"kfp.pipeline_run_id\"\
+          : pipeline_run_id or \"unknown\",\n                    \"kfp.namespace\"\
+          : namespace,\n                    \"kfp.component\": \"pipeline\",\n   \
+          \             },\n            )\n\n        tracker.create_nested_run(\"\
+          parse_and_chunk\", parent_id)\n        tracker.log_param(\"pipeline_run_id\"\
+          , pipeline_run_id or \"unknown\")\n        tracker.log_param(\"num_files\"\
+          , str(num_files))\n        tracker.log_param(\"chunk_max_tokens\", str(chunk_max_tokens))\n\
+          \        tracker.log_param(\"embedding_model\", tokenizer)\n        tracker.log_param(\"\
+          num_workers\", str(num_workers))\n        tracker.log_param(\"worker_cpus\"\
+          , str(worker_cpus))\n        tracker.log_param(\"worker_memory_gb\", str(worker_memory_gb))\n\
           \        tracker.log_param(\"s3_bucket\", s3_bucket)\n        tracker.log_param(\"\
           s3_prefix\", s3_prefix)\n        tracker.log_param(\"doc_category\", doc_category)\n\
           \        tracker.log_param(\"doc_subcategory\", doc_subcategory)\n     \
@@ -1179,6 +1515,32 @@ pipelineInfo:
 root:
   dag:
     tasks:
+      acquire-documents:
+        cachingOptions: {}
+        componentRef:
+          name: comp-acquire-documents
+        inputs:
+          parameters:
+            collection_name:
+              componentInputParameter: collection_name
+            connector_type:
+              componentInputParameter: connector_type
+            namespace:
+              componentInputParameter: namespace
+            pipeline_run_id:
+              componentInputParameter: pipeline_run_id
+            registry_url:
+              componentInputParameter: registry_url
+            s3_bucket:
+              componentInputParameter: s3_bucket
+            s3_endpoint:
+              componentInputParameter: s3_endpoint
+            s3_secret_name:
+              componentInputParameter: s3_secret_name
+            s3_staging_prefix:
+              componentInputParameter: s3_staging_prefix
+        taskInfo:
+          name: acquire-documents
       ingest-to-milvus:
         cachingOptions: {}
         componentRef:
@@ -1225,6 +1587,8 @@ root:
         cachingOptions: {}
         componentRef:
           name: comp-parse-and-chunk
+        dependentTasks:
+        - acquire-documents
         inputs:
           parameters:
             batch_size:
@@ -1249,6 +1613,10 @@ root:
               componentInputParameter: head_memory_gb
             input_path:
               componentInputParameter: input_path
+            manifest_s3_key:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: acquire-documents
             max_actors:
               componentInputParameter: max_actors
             min_actors:
@@ -1275,6 +1643,8 @@ root:
               componentInputParameter: s3_prefix
             s3_secret_name:
               componentInputParameter: s3_secret_name
+            s3_staging_prefix:
+              componentInputParameter: s3_staging_prefix
             timeout_seconds:
               componentInputParameter: timeout_seconds
             tokenizer:
@@ -1303,6 +1673,10 @@ root:
         parameterType: NUMBER_INTEGER
       collection_name:
         defaultValue: rag_documents
+        isOptional: true
+        parameterType: STRING
+      connector_type:
+        defaultValue: s3
         isOptional: true
         parameterType: STRING
       cpus_per_actor:
@@ -1417,6 +1791,10 @@ root:
         defaultValue: quay.io/rhoai-szaher/docling-ray:latest
         isOptional: true
         parameterType: STRING
+      registry_url:
+        defaultValue: http://doc-registry:8080
+        isOptional: true
+        parameterType: STRING
       s3_bucket:
         defaultValue: rag-chunks
         isOptional: true
@@ -1431,6 +1809,10 @@ root:
         parameterType: STRING
       s3_secret_name:
         defaultValue: minio-secret
+        isOptional: true
+        parameterType: STRING
+      s3_staging_prefix:
+        defaultValue: staging
         isOptional: true
         parameterType: STRING
       timeout_seconds:
@@ -1456,6 +1838,27 @@ platforms:
   kubernetes:
     deploymentSpec:
       executors:
+        exec-acquire-documents:
+          configMapAsEnv:
+          - configMapName: data-strat-lineage-config
+            configMapNameParameter:
+              runtimeValue:
+                constant: data-strat-lineage-config
+            keyToEnv:
+            - configMapKey: OPENLINEAGE_URL
+              envVar: OPENLINEAGE_URL
+            - configMapKey: MLFLOW_BRIDGE_ENABLED
+              envVar: MLFLOW_BRIDGE_ENABLED
+            optional: false
+          secretAsEnv:
+          - keyToEnv:
+            - envVar: S3_ACCESS_KEY
+              secretKey: access_key
+            - envVar: S3_SECRET_KEY
+              secretKey: secret_key
+            optional: false
+            secretNameParameter:
+              componentInputParameter: s3_secret_name
         exec-ingest-to-milvus:
           configMapAsEnv:
           - configMapName: data-strat-lineage-config
