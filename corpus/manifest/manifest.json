@@ -3,280 +3,322 @@
     "doc_id": "ug-001",
     "filename": "ny-dfs-cl2024-07-ai-underwriting.docx",
     "source_system": "ny_dfs",
-    "source_url": "https://www.dfs.ny.gov/industry-guidance/circular-letters/cl2024-07",
+    "source_url": "s3://rag-chunks/corpus/underwriting_guidelines/ny-dfs-cl2024-07-ai-underwriting.docx",
     "document_type": "circular_letter",
     "line_of_business": "all_p_and_c",
     "jurisdiction": "NY",
     "effective_date": "2024-07-11",
-    "collections": ["underwriting_guidelines"],
+    "collections": [
+      "underwriting_guidelines"
+    ],
     "format": "docx",
-    "page_count": 12,
+    "page_count": null,
     "description": "NY DFS guidance on use of AI systems and external consumer data in insurance underwriting and pricing"
   },
   {
     "doc_id": "ug-002",
     "filename": "ny-dfs-cl2025-01-disability-offset.html",
     "source_system": "ny_dfs",
-    "source_url": "https://www.dfs.ny.gov/industry-guidance/circular-letters/cl2025-01",
+    "source_url": "s3://rag-chunks/corpus/underwriting_guidelines/ny-dfs-cl2025-01-disability-offset.html",
     "document_type": "circular_letter",
     "line_of_business": "workers_comp",
     "jurisdiction": "NY",
     "effective_date": "2025-02-14",
-    "collections": ["underwriting_guidelines"],
+    "collections": [
+      "underwriting_guidelines"
+    ],
     "format": "html",
-    "page_count": 4,
+    "page_count": null,
     "description": "NY DFS guidance on SSN disability income and workers comp benefit offset provisions"
   },
   {
     "doc_id": "ug-003",
     "filename": "ny-dfs-cl2024-04-disaster-planning.docx",
     "source_system": "ny_dfs",
-    "source_url": "https://www.dfs.ny.gov/industry-guidance/circular-letters/cl2024-04",
+    "source_url": "s3://rag-chunks/corpus/underwriting_guidelines/ny-dfs-cl2024-04-disaster-planning.docx",
     "document_type": "circular_letter",
     "line_of_business": "all_p_and_c",
     "jurisdiction": "NY",
     "effective_date": "2024-06-05",
-    "collections": ["underwriting_guidelines"],
+    "collections": [
+      "underwriting_guidelines"
+    ],
     "format": "docx",
-    "page_count": 8,
+    "page_count": null,
     "description": "NY DFS disaster planning, preparedness, and response guidance for P&C insurers"
   },
   {
     "doc_id": "ug-004",
     "filename": "ca-doi-bulletin-2025-3-wildfire-claims.pdf",
     "source_system": "ca_doi",
-    "source_url": "https://www.insurance.ca.gov/0250-insurers/0300-insurers/0200-bulletins/bulletin-notices-commiss-opinion/upload/Bulletin-2025-3-Coverage-of-Flood-Mudslide-and-Earth-Movement-Claims-Relating-to-Recent-Wildfires.pdf",
+    "source_url": "s3://rag-chunks/corpus/underwriting_guidelines/ca-doi-bulletin-2025-3-wildfire-claims.pdf",
     "document_type": "bulletin",
     "line_of_business": "property",
     "jurisdiction": "CA",
     "effective_date": "2025-01-15",
-    "collections": ["underwriting_guidelines"],
+    "collections": [
+      "underwriting_guidelines"
+    ],
     "format": "pdf",
-    "page_count": 6,
+    "page_count": null,
     "description": "CA DOI guidance on coverage of flood, mudslide, and earth movement claims relating to wildfires"
   },
   {
     "doc_id": "ug-005",
     "filename": "ca-doi-bulletin-2024-7-rate-application-review.pdf",
     "source_system": "ca_doi",
-    "source_url": "https://www.insurance.ca.gov/0250-insurers/0300-insurers/0200-bulletins/bulletin-notices-commiss-opinion/upload/Bulletin-2024-7-Revisions-to-Department-Review-of-Complete-Rate-Applications.pdf",
+    "source_url": "s3://rag-chunks/corpus/underwriting_guidelines/ca-doi-bulletin-2024-7-rate-application-review.pdf",
     "document_type": "bulletin",
     "line_of_business": "all_p_and_c",
     "jurisdiction": "CA",
     "effective_date": "2024-10-01",
-    "collections": ["underwriting_guidelines"],
+    "collections": [
+      "underwriting_guidelines"
+    ],
     "format": "pdf",
-    "page_count": 10,
+    "page_count": null,
     "description": "CA DOI revisions to department review of complete rate applications"
   },
   {
     "doc_id": "ug-006",
     "filename": "ca-doi-bulletin-2025-4-fair-plan-recoupment.pdf",
     "source_system": "ca_doi",
-    "source_url": "https://www.insurance.ca.gov/0250-insurers/0300-insurers/0200-bulletins/bulletin-notices-commiss-opinion/upload/Bulletin-2025-4-Updated-Guidance-regarding-Insurer-Recoupment-Procedures-in-Response-to-Assessment-by-the-FAIR-Plan.pdf",
+    "source_url": "s3://rag-chunks/corpus/underwriting_guidelines/ca-doi-bulletin-2025-4-fair-plan-recoupment.pdf",
     "document_type": "bulletin",
     "line_of_business": "property",
     "jurisdiction": "CA",
     "effective_date": "2025-03-01",
-    "collections": ["underwriting_guidelines"],
+    "collections": [
+      "underwriting_guidelines"
+    ],
     "format": "pdf",
-    "page_count": 8,
+    "page_count": null,
     "description": "CA DOI updated guidance on insurer recoupment procedures for FAIR Plan assessments"
   },
   {
     "doc_id": "ug-007",
     "filename": "tx-tdi-catastrophe-bulletins.html",
     "source_system": "tx_tdi",
-    "source_url": "https://www.tdi.texas.gov/bulletins/Catastrophe.html",
+    "source_url": "s3://rag-chunks/corpus/underwriting_guidelines/tx-tdi-catastrophe-bulletins.html",
     "document_type": "bulletin",
     "line_of_business": "property",
     "jurisdiction": "TX",
     "effective_date": "2024-07-08",
-    "collections": ["underwriting_guidelines"],
+    "collections": [
+      "underwriting_guidelines"
+    ],
     "format": "html",
-    "page_count": 15,
+    "page_count": null,
     "description": "TX TDI catastrophe bulletin index - Hurricane Beryl guidance on claims, underwriting, deductibles"
   },
   {
     "doc_id": "ug-008",
     "filename": "naic-gl1780-pc-model-rating-law.pdf",
     "source_system": "naic",
-    "source_url": "https://content.naic.org/sites/default/files/GL1780.pdf",
+    "source_url": "s3://rag-chunks/corpus/underwriting_guidelines/naic-gl1780-pc-model-rating-law.pdf",
     "document_type": "model_law",
     "line_of_business": "all_p_and_c",
     "jurisdiction": "national",
     "effective_date": "2009-07-01",
-    "collections": ["underwriting_guidelines", "regulatory_bulletins"],
+    "collections": [
+      "underwriting_guidelines",
+      "regulatory_bulletins"
+    ],
     "format": "pdf",
-    "page_count": 30,
+    "page_count": null,
     "description": "NAIC Property and Casualty Model Rating Law (Prior Approval version)"
   },
   {
     "doc_id": "ug-009",
     "filename": "naic-gdl1776-rate-policy-form-guideline.pdf",
     "source_system": "naic",
-    "source_url": "https://content.naic.org/sites/default/files/inline-files/GDL-1776.pdf",
+    "source_url": "s3://rag-chunks/corpus/underwriting_guidelines/naic-gdl1776-rate-policy-form-guideline.pdf",
     "document_type": "guideline",
     "line_of_business": "all_p_and_c",
     "jurisdiction": "national",
     "effective_date": "2010-10-01",
-    "collections": ["underwriting_guidelines", "regulatory_bulletins"],
+    "collections": [
+      "underwriting_guidelines",
+      "regulatory_bulletins"
+    ],
     "format": "pdf",
-    "page_count": 50,
+    "page_count": null,
     "description": "NAIC Rate and Policy Form Model Law Guideline"
   },
   {
     "doc_id": "ug-010",
     "filename": "fema-nfip-flood-insurance-manual-oct2025.pdf",
     "source_system": "fema",
-    "source_url": "https://www.fema.gov/sites/default/files/documents/fema_rsl_national-flood-insurance-manual_06032025.pdf",
+    "source_url": "s3://rag-chunks/corpus/underwriting_guidelines/fema-nfip-flood-insurance-manual-oct2025.pdf",
     "document_type": "manual",
     "line_of_business": "flood",
     "jurisdiction": "federal",
     "effective_date": "2025-10-01",
-    "collections": ["underwriting_guidelines"],
+    "collections": [
+      "underwriting_guidelines"
+    ],
     "format": "pdf",
-    "page_count": 400,
+    "page_count": null,
     "description": "FEMA NFIP Flood Insurance Manual - underwriting, rating, coverage limits, deductible schedules"
   },
   {
     "doc_id": "rb-001",
     "filename": "tx-tdi-filings-made-easy-may2025.pdf",
     "source_system": "tx_tdi",
-    "source_url": "https://www.tdi.texas.gov/pubs/pc/fmeguide0525.pdf",
+    "source_url": "s3://rag-chunks/corpus/regulatory_bulletins/tx-tdi-filings-made-easy-may2025.pdf",
     "document_type": "filing_instructions",
     "line_of_business": "all_p_and_c",
     "jurisdiction": "TX",
     "effective_date": "2025-05-01",
-    "collections": ["regulatory_bulletins"],
+    "collections": [
+      "regulatory_bulletins"
+    ],
     "format": "pdf",
-    "page_count": 60,
+    "page_count": null,
     "description": "TX TDI Filings Made Easy guide - checklists, exhibit lists, filing-type matrices"
   },
   {
     "doc_id": "rb-002",
     "filename": "tx-tdi-filings-presentation-aug2024.pdf",
     "source_system": "tx_tdi",
-    "source_url": "https://www.tdi.texas.gov/InsurED/documents/property-and-casualty-filings-made-easy-august-2024.pdf",
+    "source_url": "s3://rag-chunks/corpus/regulatory_bulletins/tx-tdi-filings-presentation-aug2024.pdf",
     "document_type": "filing_instructions",
     "line_of_business": "all_p_and_c",
     "jurisdiction": "TX",
     "effective_date": "2024-08-01",
-    "collections": ["regulatory_bulletins"],
+    "collections": [
+      "regulatory_bulletins"
+    ],
     "format": "pdf",
-    "page_count": 30,
+    "page_count": null,
     "description": "TX TDI P&C Filings Made Easy presentation - slide-deck format with tables and filing guidance"
   },
   {
     "doc_id": "rb-003",
     "filename": "ca-doi-prior-approval-rate-filing-instructions.pdf",
     "source_system": "ca_doi",
-    "source_url": "https://www.insurance.ca.gov/0250-insurers/0800-rate-filings/0200-prior-approval-factors/upload/PriorAppRateFilingInstructions.pdf",
+    "source_url": "s3://rag-chunks/corpus/regulatory_bulletins/ca-doi-prior-approval-rate-filing-instructions.pdf",
     "document_type": "filing_instructions",
     "line_of_business": "all_p_and_c",
     "jurisdiction": "CA",
     "effective_date": "2023-01-01",
-    "collections": ["regulatory_bulletins"],
+    "collections": [
+      "regulatory_bulletins"
+    ],
     "format": "pdf",
-    "page_count": 40,
+    "page_count": null,
     "description": "CA DOI prior approval rate filing instructions - structured exhibits, compliance checklists"
   },
   {
     "doc_id": "rb-004",
     "filename": "naic-st1775-state-action-page.pdf",
     "source_system": "naic",
-    "source_url": "https://content.naic.org/sites/default/files/model-law-state-page-1775.pdf",
+    "source_url": "s3://rag-chunks/corpus/regulatory_bulletins/naic-st1775-state-action-page.pdf",
     "document_type": "state_action_page",
     "line_of_business": "all_p_and_c",
     "jurisdiction": "national",
     "effective_date": "2023-03-01",
-    "collections": ["regulatory_bulletins"],
+    "collections": [
+      "regulatory_bulletins"
+    ],
     "format": "pdf",
-    "page_count": 8,
+    "page_count": null,
     "description": "NAIC state action page for P&C Model Rating Law - state-by-state adoption citation grid"
   },
   {
     "doc_id": "rb-005",
     "filename": "fema-nfip-claims-manual-mar2025.pdf",
     "source_system": "fema",
-    "source_url": "https://www.fema.gov/sites/default/files/documents/fema_rsl_nfip-claims-manual_06032025.pdf",
+    "source_url": "s3://rag-chunks/corpus/regulatory_bulletins/fema-nfip-claims-manual-mar2025.pdf",
     "document_type": "manual",
     "line_of_business": "flood",
     "jurisdiction": "federal",
     "effective_date": "2025-03-01",
-    "collections": ["regulatory_bulletins"],
+    "collections": [
+      "regulatory_bulletins"
+    ],
     "format": "pdf",
-    "page_count": 30,
+    "page_count": null,
     "description": "FEMA NFIP Claims Manual - claims procedures, forms references, adjuster requirements"
   },
   {
     "doc_id": "if-001",
     "filename": "iso-cg-00-01-commercial-general-liability.pdf",
     "source_system": "iso",
-    "source_url": "https://www.isocopyright.com/forms/CG-00-01",
+    "source_url": "s3://rag-chunks/corpus/iso_forms/iso-cg-00-01-commercial-general-liability.pdf",
     "document_type": "coverage_form",
     "line_of_business": "general_liability",
     "jurisdiction": "national",
     "effective_date": "2013-04-01",
-    "collections": ["iso_forms"],
+    "collections": [
+      "iso_forms"
+    ],
     "format": "pdf",
-    "page_count": 3,
+    "page_count": null,
     "description": "ISO Commercial General Liability Coverage Form - insuring agreements, exclusions, conditions, limits"
   },
   {
     "doc_id": "if-002",
     "filename": "iso-cp-00-10-building-personal-property.pdf",
     "source_system": "iso",
-    "source_url": "https://www.isocopyright.com/forms/CP-00-10",
+    "source_url": "s3://rag-chunks/corpus/iso_forms/iso-cp-00-10-building-personal-property.pdf",
     "document_type": "coverage_form",
     "line_of_business": "commercial_property",
     "jurisdiction": "national",
     "effective_date": "2012-10-01",
-    "collections": ["iso_forms"],
+    "collections": [
+      "iso_forms"
+    ],
     "format": "pdf",
-    "page_count": 3,
+    "page_count": null,
     "description": "ISO Building and Personal Property Coverage Form - covered property, exclusions, causes of loss"
   },
   {
     "doc_id": "if-003",
     "filename": "iso-cg-20-10-additional-insured.pdf",
     "source_system": "iso",
-    "source_url": "https://www.isocopyright.com/forms/CG-20-10",
+    "source_url": "s3://rag-chunks/corpus/iso_forms/iso-cg-20-10-additional-insured.pdf",
     "document_type": "endorsement",
     "line_of_business": "general_liability",
     "jurisdiction": "national",
     "effective_date": "2013-04-01",
-    "collections": ["iso_forms"],
+    "collections": [
+      "iso_forms"
+    ],
     "format": "pdf",
-    "page_count": 2,
+    "page_count": null,
     "description": "ISO Additional Insured endorsement - Owners, Lessees or Contractors, ongoing operations only"
   },
   {
     "doc_id": "if-004",
     "filename": "acord-125-commercial-insurance-application.pdf",
     "source_system": "acord",
-    "source_url": "https://www.acord.org/standards-architecture/forms/125",
+    "source_url": "s3://rag-chunks/corpus/iso_forms/acord-125-commercial-insurance-application.pdf",
     "document_type": "application_form",
     "line_of_business": "all_p_and_c",
     "jurisdiction": "national",
     "effective_date": "2016-03-01",
-    "collections": ["iso_forms"],
+    "collections": [
+      "iso_forms"
+    ],
     "format": "pdf",
-    "page_count": 2,
+    "page_count": null,
     "description": "ACORD Commercial Insurance Application - general information, business info, premises, coverage requested"
   },
   {
     "doc_id": "if-005",
     "filename": "acord-140-property-section.pdf",
     "source_system": "acord",
-    "source_url": "https://www.acord.org/standards-architecture/forms/140",
+    "source_url": "s3://rag-chunks/corpus/iso_forms/acord-140-property-section.pdf",
     "document_type": "application_form",
     "line_of_business": "commercial_property",
     "jurisdiction": "national",
     "effective_date": "2014-01-01",
-    "collections": ["iso_forms"],
+    "collections": [
+      "iso_forms"
+    ],
     "format": "pdf",
-    "page_count": 2,
+    "page_count": null,
     "description": "ACORD Property Section supplement - building info, protection, coverage details, flood zone"
   }
 ]
