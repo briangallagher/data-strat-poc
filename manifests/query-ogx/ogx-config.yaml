@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ogx-config
+  namespace: data-strat-poc
+  labels:
+    app: ogx
+    milestone: m5
+data:
+  run.yaml: |
+    version: "2"
+    image_name: rh
+    apis:
+    - agents
+    - inference
+    - tool_runtime
+    providers:
+      inference:
+      - provider_id: vllm-granite
+        provider_type: remote::vllm
+        config:
+          api_token: ${env.VLLM_API_TOKEN:=fake}
+          max_tokens: ${env.VLLM_MAX_TOKENS:=4096}
+          tls_verify: false
+          url: http://granite-llm-predictor.data-strat-poc.svc.cluster.local:8080/v1
+      agents:
+      - provider_id: meta-reference
+        provider_type: inline::meta-reference
+        config:
+          max_infer_iters: 20
+          persistence:
+            agent_state:
+              backend: kv_default
+              namespace: agents
+            responses:
+              backend: sql_default
+              table_name: responses
+      tool_runtime:
+      - provider_id: model-context-protocol
+        provider_type: remote::model-context-protocol
+        config: {}
+    metadata_store:
+      type: sqlite
+      db_path: /opt/app-root/src/.llama/distributions/rh/inference_store.db
+    storage:
+      backends:
+        kv_default:
+          db_path: /opt/app-root/src/.llama/distributions/rh/kvstore.db
+          type: kv_sqlite
+        sql_default:
+          db_path: /opt/app-root/src/.llama/distributions/rh/sql_store.db
+          type: sql_sqlite
+      stores:
+        conversations:
+          backend: sql_default
+          table_name: openai_conversations
+        inference:
+          backend: sql_default
+          table_name: inference_store
+        metadata:
+          backend: kv_default
+          namespace: registry
+    registered_resources:
+      models:
+      - provider_id: vllm-granite
+        model_id: granite-3.3-8b-instruct
+        provider_model_id: granite-llm
+        model_type: llm
+        metadata:
+          description: "IBM Granite 3.3 8B Instruct via vLLM"
+      shields: []
+      vector_dbs: []
+      datasets: []
+      scoring_fns: []
+      benchmarks: []
+      tool_groups: []
+    server:
+      port: 8321

@@ -1,7 +1,7 @@
 # ADR-003: OGX Role in the System
 
 **Date:** 2026-05-23
-**Status:** Decided (amended by DEC-010 — OGX deferred from M4 to M5)
+**Status:** Decided (amended by DEC-010 — OGX deferred to M5; evaluated in ADR-004)
 **Milestone:** M0 (unblocks M1)
 
 > **M4 Amendment (2026-05-27):** This ADR reserved OGX Responses API for the query path starting at M4. DEC-010 amends the timing: LangGraph + MCP + MLflow autolog is used for M4's deterministic RAG (Workflow A) because it provides superior observability via `mlflow.langchain.autolog()`. OGX is reserved for M5's agentic RAG (Workflow B), where its multi-tool orchestration and agent loop are the differentiator. The ADR's core decision — direct Milvus writes for ingest, OGX for query — remains valid in spirit; the amendment is *when* OGX enters the query path.

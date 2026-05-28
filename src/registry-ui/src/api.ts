@@ -107,6 +107,25 @@ async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export interface CollectionHealth {
+  collection_name: string;
+  document_count: number;
+  vector_count: number;
+  consuming_apps: string[];
+  query_count: number;
+  last_ingest: string | null;
+  staleness_days: number | null;
+  marquez_jobs: MarquezLink[];
+}
+
+export interface AppInfo {
+  app_name: string;
+  collections: string[];
+  query_count: number;
+  last_query: string | null;
+  workflow_type: string;
+}
+
 export const api = {
   listDocuments(params?: { collection?: string; status?: string }): Promise<{ documents: Document[]; total: number }> {
     const sp = new URLSearchParams();
@@ -167,5 +186,30 @@ export const api = {
 
   getCollectionProvenance(collectionName: string): Promise<CollectionProvenance> {
     return fetchJSON(`${BASE}/provenance/collection/${collectionName}`);
+  },
+
+  getCollectionHealth(collectionName: string): Promise<CollectionHealth> {
+    return fetchJSON(`${BASE}/provenance/collection/${collectionName}/health`);
+  },
+
+  listApps(): Promise<AppInfo[]> {
+    return fetchJSON(`${BASE}/provenance/apps`);
+  },
+
+  createDocument(data: {
+    name: string;
+    source_url: string;
+    source_system: string;
+    document_type: string;
+    line_of_business: string;
+    jurisdiction: string;
+    effective_date?: string;
+    collections: string[];
+  }): Promise<Document> {
+    return fetchJSON(`${BASE}/documents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
   },
 };

@@ -208,3 +208,33 @@ The Registry backend gains federation endpoints that call MLflow API (trace sear
 Users never need to open Marquez, MLflow, or a terminal. Deep links to those systems are available for engineers who want the underlying detail.
 
 **Consequences:** The Registry evolves from a document metadata store to a provenance portal. Its backend now depends on MLflow and Marquez APIs being reachable. Need graceful degradation when backends are down (show what's available, flag what's unavailable). M5 adds Collection Health, App Overview, and Impact Analysis views when more apps exist.
+
+### DEC-012: OGX Trace Correlation Strategy
+**Date:** 2026-05-28
+**Milestone:** M5
+**Status:** Proposed (pending hands-on verification of Q2)
+
+**Context:** M5 builds the agentic compliance review agent on OGX Responses API with server-side Tool Runtime. OGX owns the agent loop: the client sends one request and gets a final response. Tools (MCP servers) are called by OGX during the loop, not by our code. This creates a trace correlation problem — how do we build a single MLflow trace that captures the client request, OGX's tool calls, and the tool results?
+
+Phase 0b investigated four questions:
+
+| # | Question | Finding |
+|---|----------|---------|
+| Q1 | Does the Responses API response include tool call details? | **Yes** — response contains `function_call` and `function_call_output` items with tool names, arguments, and results |
+| Q2 | Does `mlflow.openai.autolog()` capture tool call rounds? | **Likely yes, pending verification** — Responses API is OpenAI-compatible; autolog should parse tool call items into child spans |
+| Q3 | Does OGX propagate trace context to MCP tool calls? | **No** — OGX has `forward_headers` for auth but no OpenTelemetry `traceparent` propagation to MCP servers |
+| Q4 | What protocol does OGX use for custom tools? | **MCP via SSE** — MCP servers registered in run.yaml or programmatically; OGX connects via SSE, discovers tools at startup |
+
+**Decision:** Client-side trace reconstruction from the Responses API response.
+
+Since Q1=Yes (response includes full tool call details), the client can reconstruct the entire agent interaction from the response output items. The strategy:
+
+1. **Client-side:** `mlflow.openai.autolog()` captures the Responses API call. If autolog parses tool call rounds into child spans (Q2), we get the full trace automatically. If not, we parse `function_call` and `function_call_output` items from the response and create manual child spans.
+
+2. **Trace enrichment:** After the response completes, extract search metadata from `function_call_output` items (which contain the MCP tool results with doc_ids, pipeline_run_ids, chunks). Tag the trace with the contract schema: `doc_ids_cited`, `pipeline_run_ids`, `collection_queried`, `chunks_detail`, `answer_preview`, `chunks_retrieved_count`.
+
+3. **Tool service spans are not needed for core tracing.** Since the client gets the full tool call details in the response, the tool service (MCP server) doesn't need to emit its own MLflow spans for trace completeness. The MCP server is a pure compute service — OGX calls it, gets results, includes them in the response. All provenance data flows through the client.
+
+This is analogous to how M4's `mlflow.langchain.autolog()` captures LangGraph tool calls without the MCP server needing its own MLflow instrumentation.
+
+**Consequences:** Simpler architecture — tool service stays clean (no MLflow dependency). All tracing happens client-side. Trade-off: if OGX encounters errors during tool calls that aren't reflected in the response, the client won't see them. Acceptable for POC; revisit if tool reliability is an issue.

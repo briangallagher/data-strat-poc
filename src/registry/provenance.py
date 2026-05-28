@@ -387,6 +387,178 @@ async def list_traces():
     return {"traces": summaries, "total": len(summaries)}
 
 
+# --- M5: Collection Health, Apps, Impact Analysis ---
+
+
+class CollectionHealth(BaseModel):
+    collection_name: str
+    document_count: int
+    vector_count: int
+    consuming_apps: list[str]
+    query_count: int
+    last_ingest: Optional[str]
+    staleness_days: Optional[int]
+    marquez_jobs: list[MarquezLink]
+
+
+class AppInfo(BaseModel):
+    app_name: str
+    collections: list[str]
+    query_count: int
+    last_query: Optional[str]
+    workflow_type: str
+
+
+@router.get("/collection/{collection_name}/health", response_model=CollectionHealth)
+async def get_collection_health(collection_name: str):
+    """Aggregated health metrics for a collection.
+
+    Combines: Registry (doc count, last ingest), Marquez (consuming apps),
+    MLflow (query volume).
+    """
+    from datetime import datetime as dt
+    from .db import SessionLocal, CollectionRow, CollectionDocumentRow
+
+    db = SessionLocal()
+    try:
+        coll = db.query(CollectionRow).filter(CollectionRow.name == collection_name).first()
+        if not coll:
+            raise HTTPException(404, f"Collection {collection_name} not found")
+
+        links = db.query(CollectionDocumentRow).filter(
+            CollectionDocumentRow.collection_id == coll.id
+        ).all()
+        doc_count = len(links)
+
+        total_vectors = sum(link.vector_count or 0 for link in links)
+
+        last_ingest = None
+        last_ingest_dt = None
+        for link in links:
+            if link.last_ingested:
+                if last_ingest_dt is None or link.last_ingested > last_ingest_dt:
+                    last_ingest_dt = link.last_ingested
+        if last_ingest_dt:
+            last_ingest = last_ingest_dt.isoformat()
+
+        staleness_days = None
+        if last_ingest_dt:
+            staleness_days = (dt.now(last_ingest_dt.tzinfo or None) - last_ingest_dt).days
+
+        jobs = await _get_marquez_jobs()
+        consuming_apps = []
+        marquez_jobs = []
+        for job in jobs:
+            job_inputs = job.get("inputs", [])
+            for inp in job_inputs:
+                if collection_name in inp.get("name", ""):
+                    app_name = job["name"]
+                    if app_name not in consuming_apps:
+                        consuming_apps.append(app_name)
+                    marquez_jobs.append(MarquezLink(
+                        job_name=app_name,
+                        run_id="",
+                        namespace=job.get("namespace", MARQUEZ_NAMESPACE),
+                        url=f"{MARQUEZ_API_URL}/lineage/{MARQUEZ_NAMESPACE}/{app_name}",
+                    ))
+
+        traces = await _search_mlflow_traces()
+        query_count = 0
+        for trace in traces:
+            tags = {t.get("key", ""): t.get("value", "") for t in trace.get("tags", [])}
+            queried_colls = tags.get("collection_queried", "")
+            if collection_name in queried_colls:
+                query_count += 1
+
+        return CollectionHealth(
+            collection_name=collection_name,
+            document_count=doc_count,
+            vector_count=total_vectors,
+            consuming_apps=consuming_apps,
+            query_count=query_count,
+            last_ingest=last_ingest,
+            staleness_days=staleness_days,
+            marquez_jobs=marquez_jobs,
+        )
+    finally:
+        db.close()
+
+
+@router.get("/apps", response_model=list[AppInfo])
+async def list_apps():
+    """List all registered applications with their collection consumption and query metrics.
+
+    Applications are Marquez jobs of type APPLICATION that consume Milvus collections.
+    Query counts and workflow types come from MLflow traces.
+    """
+    jobs = await _get_marquez_jobs()
+
+    app_map: dict[str, AppInfo] = {}
+    for job in jobs:
+        job_type = job.get("facets", {}).get("jobType", {}).get("jobType", "")
+        if job_type != "APPLICATION":
+            continue
+
+        app_name = job["name"]
+        collections = []
+        for inp in job.get("inputs", []):
+            input_name = inp.get("name", "")
+            if input_name:
+                collections.append(input_name)
+
+        app_map[app_name] = AppInfo(
+            app_name=app_name,
+            collections=collections,
+            query_count=0,
+            last_query=None,
+            workflow_type="unknown",
+        )
+
+    traces = await _search_mlflow_traces(max_results=100)
+    for trace in traces:
+        tags = {t.get("key", ""): t.get("value", "") for t in trace.get("tags", [])}
+        trace_app = tags.get("app_name", "")
+        if trace_app and trace_app in app_map:
+            app_map[trace_app].query_count += 1
+            ts = str(trace.get("timestamp_ms", ""))
+            if ts and (app_map[trace_app].last_query is None or ts > app_map[trace_app].last_query):
+                app_map[trace_app].last_query = ts
+            wf = tags.get("workflow", "")
+            if wf:
+                app_map[trace_app].workflow_type = wf
+
+    if not app_map:
+        known_apps = [
+            AppInfo(
+                app_name="underwriter_chat",
+                collections=["underwriting_guidelines"],
+                query_count=len([
+                    t for t in traces
+                    if any(tag.get("value") == "underwriter_chat"
+                           for tag in t.get("tags", [])
+                           if tag.get("key") == "app_name")
+                ]),
+                last_query=None,
+                workflow_type="deterministic",
+            ),
+            AppInfo(
+                app_name="compliance_review_agent",
+                collections=["underwriting_guidelines", "iso_forms", "regulatory_bulletins"],
+                query_count=len([
+                    t for t in traces
+                    if any(tag.get("value") == "compliance_review_agent"
+                           for tag in t.get("tags", [])
+                           if tag.get("key") == "app_name")
+                ]),
+                last_query=None,
+                workflow_type="agentic",
+            ),
+        ]
+        return known_apps
+
+    return list(app_map.values())
+
+
 def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[TraceSummary]:
     """Extract a TraceSummary from an MLflow trace list response."""
     try:

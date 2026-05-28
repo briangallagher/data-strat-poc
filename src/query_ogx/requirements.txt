@@ -1,0 +1,9 @@
+openai
+fastmcp
+pymilvus
+sentence-transformers
+mlflow
+mlflow-tracing
+chainlit
+python-dotenv
+httpx

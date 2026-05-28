@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-knowledge-base
+  namespace: data-strat-poc
+  labels:
+    app: mcp-knowledge-base
+    milestone: m5
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mcp-knowledge-base
+  template:
+    metadata:
+      labels:
+        app: mcp-knowledge-base
+    spec:
+      initContainers:
+        - name: git-clone
+          image: alpine/git:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              git clone --branch main --depth 1 https://github.com/briangallagher/data-strat-poc.git /app-src
+          volumeMounts:
+            - name: app-source
+              mountPath: /app-src
+      containers:
+        - name: mcp-server
+          image: python:3.12-slim
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -ex
+              pip install fastmcp pymilvus sentence-transformers pydantic
+              cd /app-src/src/query_ogx
+              exec python mcp_server.py
+          ports:
+            - containerPort: 8000
+              name: sse
+          env:
+            - name: MILVUS_URI
+              value: "http://milvus.data-strat-poc.svc.cluster.local:19530"
+            - name: EMBEDDING_MODEL
+              value: "ibm-granite/granite-embedding-125m-english"
+            - name: MCP_HOST
+              value: "0.0.0.0"
+            - name: MCP_PORT
+              value: "8000"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 1Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          readinessProbe:
+            httpGet:
+              path: /sse
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          volumeMounts:
+            - name: app-source
+              mountPath: /app-src
+            - name: model-cache
+              mountPath: /root/.cache
+      volumes:
+        - name: app-source
+          emptyDir: {}
+        - name: model-cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-knowledge-base
+  namespace: data-strat-poc
+  labels:
+    app: mcp-knowledge-base
+spec:
+  selector:
+    app: mcp-knowledge-base
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: sse

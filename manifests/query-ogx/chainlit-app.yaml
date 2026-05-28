@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: compliance-review-ui
+  namespace: data-strat-poc
+  labels:
+    app: compliance-review-ui
+    milestone: m5
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: compliance-review-ui
+  template:
+    metadata:
+      labels:
+        app: compliance-review-ui
+    spec:
+      serviceAccountName: pipeline-runner
+      initContainers:
+        - name: git-clone
+          image: alpine/git:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              git clone --branch main --depth 1 https://github.com/briangallagher/data-strat-poc.git /app-src
+          volumeMounts:
+            - name: app-source
+              mountPath: /app-src
+      containers:
+        - name: chainlit
+          image: python:3.12-slim
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -ex
+              pip install openai chainlit mlflow mlflow-tracing httpx python-dotenv
+              cd /app-src/src/query_ogx
+              exec chainlit run app.py --host 0.0.0.0 --port 8080
+          ports:
+            - containerPort: 8080
+          env:
+            - name: OGX_BASE_URL
+              value: "http://llamastack.data-strat-poc.svc.cluster.local:8321/v1"
+            - name: OGX_API_KEY
+              value: "fake"
+            - name: OGX_MODEL
+              value: "granite-3.3-8b-instruct"
+            - name: MCP_SERVER_URL
+              value: "http://mcp-knowledge-base.data-strat-poc.svc.cluster.local:8000/sse"
+            - name: MLFLOW_TRACKING_URI
+              value: "https://mlflow.redhat-ods-applications.svc:8443"
+            - name: MLFLOW_EXPERIMENT_NAME
+              value: "compliance-review-agent"
+            - name: MARQUEZ_API_URL
+              value: "http://marquez.data-strat-poc.svc.cluster.local:5000"
+            - name: APP_NAME
+              value: "compliance_review_agent"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: app-source
+              mountPath: /app-src
+      volumes:
+        - name: app-source
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: compliance-review-ui
+  namespace: data-strat-poc
+  labels:
+    app: compliance-review-ui
+spec:
+  selector:
+    app: compliance-review-ui
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: compliance-review-ui
+  namespace: data-strat-poc
+spec:
+  to:
+    kind: Service
+    name: compliance-review-ui
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

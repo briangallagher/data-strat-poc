@@ -20,6 +20,10 @@ import { CreateCollectionPage } from './pages/CreateCollectionPage';
 import { QueryTracesPage } from './pages/QueryTracesPage';
 import { TraceDetailPage } from './pages/TraceDetailPage';
 import { DocumentProvenancePage } from './pages/DocumentProvenancePage';
+import { CollectionHealthPage } from './pages/CollectionHealthPage';
+import { AppOverviewPage } from './pages/AppOverviewPage';
+import { ImpactAnalysisPage } from './pages/ImpactAnalysisPage';
+import { RegisterDocumentsPage } from './pages/RegisterDocumentsPage';
 
 function AppNav() {
   const location = useLocation();
@@ -30,11 +34,23 @@ function AppNav() {
         <NavItem isActive={location.pathname === '/' || location.pathname.startsWith('/documents')}>
           <Link to="/documents">Documents</Link>
         </NavItem>
-        <NavItem isActive={location.pathname.startsWith('/collections')}>
+        <NavItem isActive={location.pathname.startsWith('/collections') && !location.pathname.startsWith('/collections/health')}>
           <Link to="/collections">Collections</Link>
         </NavItem>
         <NavItem isActive={location.pathname.startsWith('/traces')}>
           <Link to="/traces">Queries</Link>
+        </NavItem>
+        <NavItem isActive={location.pathname === '/health'}>
+          <Link to="/health">Collection Health</Link>
+        </NavItem>
+        <NavItem isActive={location.pathname === '/apps'}>
+          <Link to="/apps">Applications</Link>
+        </NavItem>
+        <NavItem isActive={location.pathname === '/impact'}>
+          <Link to="/impact">Impact Analysis</Link>
+        </NavItem>
+        <NavItem isActive={location.pathname === '/register'}>
+          <Link to="/register">Register Documents</Link>
         </NavItem>
       </NavList>
     </Nav>
@@ -50,7 +66,7 @@ export function App() {
         </MastheadBrand>
       </MastheadMain>
       <MastheadContent>
-        <Content component="small">Data Strategy POC v2 — M4 Query</Content>
+        <Content component="small">Data Strategy POC v2 — M5 Agentic</Content>
       </MastheadContent>
     </Masthead>
   );
@@ -76,6 +92,10 @@ export function App() {
           <Route path="/traces" element={<QueryTracesPage />} />
           <Route path="/traces/:traceId" element={<TraceDetailPage />} />
           <Route path="/documents/:docId/provenance" element={<DocumentProvenancePage />} />
+          <Route path="/health" element={<CollectionHealthPage />} />
+          <Route path="/apps" element={<AppOverviewPage />} />
+          <Route path="/impact" element={<ImpactAnalysisPage />} />
+          <Route path="/register" element={<RegisterDocumentsPage />} />
         </Routes>
       </Page>
     </BrowserRouter>

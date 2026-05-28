@@ -3,7 +3,7 @@
 Every deviation from enterprise/production standard is tracked here. Nothing is silently accepted.
 
 **Updated at:** every milestone checkpoint.
-**Last Updated:** 2026-05-28 (M4 complete — 53 gaps tracked; M3 added PG-026–PG-041, M4 added PG-042–PG-053)
+**Last Updated:** 2026-05-28 (M5 in progress — 60 gaps tracked; M5 added PG-054–PG-060, closed PG-037)
 
 ## How to Use
 
@@ -105,7 +105,7 @@ Issues with document identity, the Document Registry service, and collection man
 | PG-034 | Manifest not treated as versioned record | Manifest is transient (written to S3 staging, consumed, forgotten) | Version and store manifests per `pipeline_run_id` for audit trail | Store in Registry or dedicated artifact store | Open |
 | PG-035 | Connector ABC not split into Fetcher/Discoverer | Single ABC handles both fetch and discover (only fetch implemented) | Separate concerns: `Fetcher` (download known files) and `Discoverer` (scan for new files) | Refactor when discovery workflow lands (PG-033) | Open |
 | PG-036 | Registry models "Document" not generic "Dataset" | Built for Scenario B (PDF-centric) | Generalise to Dataset with type discrimination (document, table, feature_set, model) | Refactor when Scenario A or cross-scenario use cases arrive | Open |
-| PG-037 | Registry UI lacks registration form | Documents registered only via API/SDK, not UI | "Register Document" page with form fields | M5+ UI enhancement | Open |
+| PG-037 | Registry UI lacks registration form | Documents registered only via API/SDK, not UI | "Register Document" page with form fields | **Fixed:** M5 — `RegisterDocumentsPage.tsx` added to Registry UI | **Closed** (M5) |
 | PG-038 | Registry UI lacks discovery/re-scan trigger | No way to trigger source system scan from the UI | "Scan Source" button on collection detail page | Depends on PG-033 (discovery workflow) | Open |
 
 ## Infrastructure / Operations
@@ -135,7 +135,21 @@ Issues with the RAG query service, chat UI, LLM serving, and provenance portal.
 | PG-050 | Chainlit incompatible with Python 3.14 | asyncio changes in Python 3.14 break Chainlit's event loop | Chainlit runs on Python 3.14 without workarounds | Upstream Chainlit fix; pin to Python 3.12/3.13 as workaround | Open |
 | PG-051 | MLflow workspace header requires monkeypatch | RHOAI MLflow Operator requires `X-Mlflow-Workspace` header; no clean injection point in MLflow client | MLflow client supports custom headers natively | Upstream feature request to MLflow; or RHOAI MLflow Operator removes requirement | **Mitigated** (`mlflow_config.py` monkeypatch) |
 | PG-052 | Port-forward instability for local dev | Services drop idle connections; port-forwards need restarting frequently during development | Stable dev connectivity | Deploy query service on cluster (removes local port-forward dependency) or use persistent tunnel | Open |
-| PG-053 | Query service not yet deployed on cluster | Runs locally with port-forwards to cluster services | Deployed as pod with route in `data-strat-poc` namespace | Deploy Chainlit + MCP server as pod; configure cluster MLflow auth | Open |
+| PG-053 | Query service not yet deployed on cluster | Runs locally with port-forwards to cluster services | Deployed as pod with route in `data-strat-poc` namespace | M5 adds deployment manifests for both M4 (underwriter_chat) and M5 (compliance_review_agent). MCP server deploys as separate pod. | Open |
+
+## OGX / Agentic RAG
+
+Issues with OGX (Llama Stack) deployment, agentic query orchestration, and MCP tool integration.
+
+| ID | Gap | Why It Exists | Production Standard | Path to Close | Status |
+|----|-----|---------------|---------------------|---------------|--------|
+| PG-054 | OGX Responses API is Dev Preview | RHOAI 3.4 marks Responses API as experimental/dev preview | GA Responses API with stable OpenAI compatibility | Track OGX maturity in RHOAI releases | Open |
+| PG-055 | No OTel trace context propagation to MCP tools | OGX has `forward_headers` for auth but no automatic OpenTelemetry `traceparent` forwarding | Full distributed tracing across OGX → MCP tool calls | Upstream feature request to Llama Stack; or client-side reconstruction (DEC-012 strategy) | **Mitigated** (DEC-012) |
+| PG-056 | MCP server downloads embedding model on startup | Same as PG-019 — `sentence-transformers` downloads from HuggingFace on each pod restart | Pre-loaded model on PVC | Share PVC-cached model between M4 MCP server and M5 MCP server | Open |
+| PG-057 | OGX agent may skip tool calls (like PG-047) | LLMs may answer from parametric knowledge without searching, bypassing retrieval | Mandatory retrieval before generation | Monitor via MLflow traces; system prompt hardening; evaluate `tool_choice: "required"` | Open |
+| PG-058 | No streaming support in M5 Chainlit app | M5 app uses non-streaming Responses API call | Streaming responses for better UX | Add `stream=True` to `client.responses.create()` and stream chunks to Chainlit | Open |
+| PG-059 | Two separate Chainlit apps for POC | M4 (underwriter_chat) and M5 (compliance_review_agent) are separate apps | Single app with workflow selector | Combine into one Chainlit app with dropdown: deterministic vs agentic | Open |
+| PG-060 | No autolog verification for Responses API | `mlflow.openai.autolog()` may not fully capture Responses API tool call rounds | Verified autolog coverage with child spans for each tool call | Hands-on verification; fall back to manual spans if needed | Open |
 
 ---
 
@@ -150,7 +164,8 @@ Issues with the RAG query service, chat UI, LLM serving, and provenance portal.
 | Lineage / Observability | 9 | 4 (PG-009, PG-024, PG-025 closed; PG-023 deferred) | 5 |
 | Connectors / Data Ingestion | 3 | 1 (PG-020 closed) | 2 |
 | Security / Platform | 2 | 0 | 2 |
-| Document Registry / Identity | 13 | 0 | 13 |
+| Document Registry / Identity | 13 | 1 (PG-037 closed) | 12 |
 | Infrastructure / Operations | 3 | 0 | 3 |
 | Query / Chat | 12 | 3 (PG-047 closed, PG-051 mitigated) | 9 |
-| **Total** | **53** | **10** | **43** |
+| OGX / Agentic RAG | 7 | 1 (PG-055 mitigated) | 6 |
+| **Total** | **60** | **12** | **48** |

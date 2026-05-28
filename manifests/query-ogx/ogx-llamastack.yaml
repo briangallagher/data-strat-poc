@@ -1,0 +1,36 @@
+apiVersion: llamastack.io/v1alpha1
+kind: LlamaStackDistribution
+metadata:
+  name: ogx-compliance
+  namespace: data-strat-poc
+  labels:
+    app: ogx
+    milestone: m5
+spec:
+  replicas: 1
+  server:
+    distribution:
+      name: rh-dev
+    containerSpec:
+      name: llama-stack
+      command:
+        - /bin/sh
+        - -c
+        - llama stack run /etc/llama-stack/run.yaml
+      port: 8321
+      env:
+        - name: VLLM_TLS_VERIFY
+          value: "false"
+        - name: VLLM_API_TOKEN
+          value: "fake"
+        - name: VLLM_MAX_TOKENS
+          value: "4096"
+      resources:
+        requests:
+          cpu: 250m
+          memory: 500Mi
+        limits:
+          cpu: "2"
+          memory: 4Gi
+    userConfig:
+      configMapName: ogx-config
