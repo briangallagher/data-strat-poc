@@ -19,7 +19,12 @@ MLFLOW_EXTERNAL_URL = os.environ.get(
     "https://rh-ai.apps.dev.aip-ft.rh-ods.com/mlflow",
 )
 MLFLOW_WORKSPACE = os.environ.get("MLFLOW_WORKSPACE", "data-strat-poc")
-MLFLOW_EXPERIMENT_NAME = os.environ.get("MLFLOW_EXPERIMENT_NAME", "underwriter-chat-v3")
+MLFLOW_EXPERIMENT_NAMES = [
+    s.strip() for s in os.environ.get(
+        "MLFLOW_EXPERIMENT_NAMES",
+        os.environ.get("MLFLOW_EXPERIMENT_NAME", "compliance-review-agent,underwriter-chat-v3"),
+    ).split(",") if s.strip()
+]
 MARQUEZ_NAMESPACE = os.environ.get("MARQUEZ_NAMESPACE", "data-strat-poc")
 MARQUEZ_WEB_URL = os.environ.get(
     "MARQUEZ_WEB_URL",
@@ -163,8 +168,8 @@ async def _get_marquez_runs_for_job(job_name: str, namespace: str = MARQUEZ_NAME
 # --- MLflow Helpers ---
 
 
-async def _get_mlflow_experiment_id() -> str:
-    """Resolve the experiment ID for the underwriter-chat experiment."""
+async def _get_mlflow_experiment_ids() -> list[str]:
+    """Resolve experiment IDs for all configured experiment names."""
     client = _get_client()
     try:
         resp = await client.post(
@@ -173,59 +178,64 @@ async def _get_mlflow_experiment_id() -> str:
             headers=_mlflow_headers(),
         )
         resp.raise_for_status()
+        ids = []
         for exp in resp.json().get("experiments", []):
-            if exp.get("name") == MLFLOW_EXPERIMENT_NAME:
-                return exp["experiment_id"]
+            if exp.get("name") in MLFLOW_EXPERIMENT_NAMES:
+                ids.append(exp["experiment_id"])
+        return ids
     except Exception as e:
         logger.warning(f"MLflow experiment search failed: {e}")
-    return ""
+    return []
 
 
 async def _search_mlflow_traces(
     max_results: int = 20,
 ) -> list[dict]:
-    """Search MLflow traces. Returns trace metadata."""
+    """Search MLflow traces across all configured experiments."""
     client = _get_client()
-    try:
-        exp_id = await _get_mlflow_experiment_id()
-        if not exp_id:
-            logger.warning("Could not resolve MLflow experiment ID")
-            return []
-
-        resp = await client.get(
-            f"{MLFLOW_API_URL}/api/2.0/mlflow/traces",
-            params={"experiment_ids": exp_id, "max_results": max_results},
-            headers=_mlflow_headers(),
-        )
-        resp.raise_for_status()
-        return resp.json().get("traces", [])
-    except Exception as e:
-        logger.warning(f"MLflow trace search failed: {e}")
+    exp_ids = await _get_mlflow_experiment_ids()
+    if not exp_ids:
+        logger.warning("Could not resolve any MLflow experiment IDs")
         return []
+
+    all_traces: list[dict] = []
+    for exp_id in exp_ids:
+        try:
+            resp = await client.get(
+                f"{MLFLOW_API_URL}/api/2.0/mlflow/traces",
+                params={"experiment_ids": exp_id, "max_results": max_results},
+                headers=_mlflow_headers(),
+            )
+            resp.raise_for_status()
+            all_traces.extend(resp.json().get("traces", []))
+        except Exception as e:
+            logger.warning(f"MLflow trace search failed for experiment {exp_id}: {e}")
+
+    all_traces.sort(key=lambda t: t.get("timestamp_ms", 0), reverse=True)
+    return all_traces[:max_results]
 
 
 async def _get_mlflow_trace(trace_id: str) -> Optional[dict]:
-    """Fetch a single trace by filtering the list endpoint (RHOAI MLflow lacks GET /traces/{id})."""
+    """Fetch a single trace by searching across all configured experiments."""
     client = _get_client()
-    try:
-        exp_id = await _get_mlflow_experiment_id()
-        if not exp_id:
-            return None
+    exp_ids = await _get_mlflow_experiment_ids()
+    if not exp_ids:
+        return None
 
-        resp = await client.get(
-            f"{MLFLOW_API_URL}/api/2.0/mlflow/traces",
-            params={"experiment_ids": exp_id, "request_ids": trace_id},
-            headers=_mlflow_headers(),
-        )
-        resp.raise_for_status()
-        traces = resp.json().get("traces", [])
-        for t in traces:
-            if t.get("request_id") == trace_id:
-                return t
-        return None
-    except Exception as e:
-        logger.warning(f"MLflow trace fetch failed for {trace_id}: {e}")
-        return None
+    for exp_id in exp_ids:
+        try:
+            resp = await client.get(
+                f"{MLFLOW_API_URL}/api/2.0/mlflow/traces",
+                params={"experiment_ids": exp_id, "request_ids": trace_id},
+                headers=_mlflow_headers(),
+            )
+            resp.raise_for_status()
+            for t in resp.json().get("traces", []):
+                if t.get("request_id") == trace_id:
+                    return t
+        except Exception as e:
+            logger.warning(f"MLflow trace fetch failed for {trace_id} in experiment {exp_id}: {e}")
+    return None
 
 
 # --- Provenance Endpoints ---
