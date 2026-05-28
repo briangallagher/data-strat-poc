@@ -196,6 +196,10 @@ export const api = {
     return fetchJSON(`${BASE}/provenance/apps`);
   },
 
+  getExternalLinks(): Promise<{ marquez_web: string; marquez_api: string; mlflow: string; marquez_lineage: string }> {
+    return fetchJSON(`${BASE}/provenance/links`);
+  },
+
   createDocument(data: {
     name: string;
     source_url: string;

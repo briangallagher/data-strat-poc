@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import {
   Page,
   Masthead,
@@ -8,9 +9,11 @@ import {
   Nav,
   NavItem,
   NavList,
+  NavGroup,
   PageSidebar,
   PageSidebarBody,
   Content,
+  Divider,
 } from '@patternfly/react-core';
 import { DocumentsPage } from './pages/DocumentsPage';
 import { DocumentDetailPage } from './pages/DocumentDetailPage';
@@ -24,9 +27,15 @@ import { CollectionHealthPage } from './pages/CollectionHealthPage';
 import { AppOverviewPage } from './pages/AppOverviewPage';
 import { ImpactAnalysisPage } from './pages/ImpactAnalysisPage';
 import { RegisterDocumentsPage } from './pages/RegisterDocumentsPage';
+import { api } from './api';
 
 function AppNav() {
   const location = useLocation();
+  const [links, setLinks] = useState<{ marquez_web?: string; mlflow?: string; marquez_lineage?: string }>({});
+
+  useEffect(() => {
+    api.getExternalLinks().then(setLinks).catch(() => {});
+  }, []);
 
   return (
     <Nav>
@@ -53,6 +62,23 @@ function AppNav() {
           <Link to="/register">Register Documents</Link>
         </NavItem>
       </NavList>
+      {(links.marquez_lineage || links.mlflow) && (
+        <>
+          <Divider />
+          <NavGroup title="Observability">
+            {links.marquez_lineage && (
+              <NavItem>
+                <a href={links.marquez_lineage} target="_blank" rel="noopener noreferrer">Marquez Lineage ↗</a>
+              </NavItem>
+            )}
+            {links.mlflow && (
+              <NavItem>
+                <a href={links.mlflow} target="_blank" rel="noopener noreferrer">MLflow ↗</a>
+              </NavItem>
+            )}
+          </NavGroup>
+        </>
+      )}
     </Nav>
   );
 }

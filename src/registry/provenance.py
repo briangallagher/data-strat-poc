@@ -21,6 +21,10 @@ MLFLOW_EXTERNAL_URL = os.environ.get(
 MLFLOW_WORKSPACE = os.environ.get("MLFLOW_WORKSPACE", "data-strat-poc")
 MLFLOW_EXPERIMENT_NAME = os.environ.get("MLFLOW_EXPERIMENT_NAME", "underwriter-chat-v3")
 MARQUEZ_NAMESPACE = os.environ.get("MARQUEZ_NAMESPACE", "data-strat-poc")
+MARQUEZ_WEB_URL = os.environ.get(
+    "MARQUEZ_WEB_URL",
+    "https://marquez-web-data-strat-poc.apps.dev.aip-ft.rh-ods.com",
+)
 
 SA_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
@@ -387,6 +391,17 @@ async def list_traces():
     return {"traces": summaries, "total": len(summaries)}
 
 
+@router.get("/links")
+async def get_external_links():
+    """Return external tool URLs for the UI sidebar."""
+    return {
+        "marquez_web": MARQUEZ_WEB_URL,
+        "marquez_api": MARQUEZ_API_URL,
+        "mlflow": MLFLOW_EXTERNAL_URL,
+        "marquez_lineage": f"{MARQUEZ_WEB_URL}/lineage/{MARQUEZ_NAMESPACE}",
+    }
+
+
 # --- M5: Collection Health, Apps, Impact Analysis ---
 
 
@@ -560,13 +575,18 @@ async def list_apps():
 
 
 def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[TraceSummary]:
-    """Extract a TraceSummary from an MLflow trace list response."""
+    """Extract a TraceSummary from an MLflow trace list response.
+
+    Handles two formats:
+    - Tag-based: deterministic RAG traces with collection_queried, doc_ids_cited, etc.
+    - OpenAI chat completion: agentic traces with choices[].message.content and tool_calls.
+    """
     try:
         import json as _json
+        import re as _re
 
         trace_id = trace.get("request_id", "")
         timestamp = str(trace.get("timestamp_ms", ""))
-        status = trace.get("status", "")
 
         question = ""
         answer_preview = ""
@@ -574,29 +594,44 @@ def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[Tra
         for meta in trace.get("request_metadata", []):
             metadata_dict[meta.get("key", "")] = meta.get("value", "")
 
-        # Extract question from traceInputs
+        # --- Question: find the last user message in traceInputs ---
+        inputs_raw = metadata_dict.get("mlflow.traceInputs", "{}")
         try:
-            inputs = _json.loads(metadata_dict.get("mlflow.traceInputs", "{}"))
+            inputs = _json.loads(inputs_raw)
             msgs = inputs.get("messages", [])
-            if msgs:
-                question = msgs[0].get("content", "")[:200]
-        except (_json.JSONDecodeError, TypeError, IndexError):
-            pass
-
-        # Extract answer from traceOutputs — last AI message
-        try:
-            outputs = _json.loads(metadata_dict.get("mlflow.traceOutputs", "{}"))
-            msgs = outputs.get("messages", [])
             for msg in reversed(msgs):
-                msg_type = msg.get("type", "")
-                content = msg.get("content", "")
-                if msg_type in ("ai", "AIMessage") and content:
-                    answer_preview = content[:500]
+                if msg.get("role") == "user":
+                    question = msg.get("content", "")[:200]
                     break
         except (_json.JSONDecodeError, TypeError, IndexError):
+            # JSON may be truncated by MLflow size limits — regex fallback
+            m = _re.search(r'"role":\s*"user",\s*"content":\s*"([^"]+)', inputs_raw)
+            if m:
+                question = m.group(1)[:200]
+
+        # --- Answer: handle both chat completion and message-list formats ---
+        outputs_raw = metadata_dict.get("mlflow.traceOutputs", "{}")
+        try:
+            outputs = _json.loads(outputs_raw)
+            # OpenAI chat completion format: choices[].message.content
+            if "choices" in outputs:
+                for choice in outputs["choices"]:
+                    content = choice.get("message", {}).get("content", "")
+                    if content:
+                        answer_preview = content[:500]
+                        break
+            # LangChain/agent format: messages[].content where type=ai
+            elif "messages" in outputs:
+                for msg in reversed(outputs.get("messages", [])):
+                    msg_type = msg.get("type", "")
+                    content = msg.get("content", "")
+                    if msg_type in ("ai", "AIMessage") and content:
+                        answer_preview = content[:500]
+                        break
+        except (_json.JSONDecodeError, TypeError, IndexError):
             pass
 
-        # Extract tags (doc_ids_cited, collection_queried)
+        # --- Tags ---
         tags = {}
         for tag in trace.get("tags", []):
             tags[tag.get("key", "")] = tag.get("value", "")
@@ -604,29 +639,29 @@ def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[Tra
         doc_ids_cited = [d for d in tags.get("doc_ids_cited", "").split(",") if d]
         collection = tags.get("collection_queried", "")
 
-        # Answer from tag (not truncated) takes priority over traceOutputs (truncated)
         if not answer_preview and tags.get("answer_preview"):
             answer_preview = tags["answer_preview"]
 
-        # If no tags, try to extract collection from the traceOutputs (retrieve step)
+        # --- Collection from tool_calls in traceInputs or traceOutputs ---
+        if not collection:
+            collection = _extract_collection_from_raw(inputs_raw, outputs_raw)
+
+        # --- Fallback: collection from retrieved_chunks in outputs ---
         if not collection and not doc_ids_cited:
             try:
-                outputs = _json.loads(metadata_dict.get("mlflow.traceOutputs", "{}"))
-                msgs = outputs.get("messages", [])
-                for msg in msgs:
-                    content = msg.get("content", "")
-                    if "retrieved_chunks" in str(outputs):
-                        rc = outputs.get("retrieved_chunks", "")
-                        if isinstance(rc, str) and rc.startswith("{"):
-                            parsed_rc = _json.loads(rc)
-                            collection = parsed_rc.get("collection", "")
-                            doc_ids_cited = list(set(
-                                c.get("doc_id", "") for c in parsed_rc.get("chunks", []) if c.get("doc_id")
-                            ))
+                outputs = _json.loads(outputs_raw)
+                if "retrieved_chunks" in str(outputs):
+                    rc = outputs.get("retrieved_chunks", "")
+                    if isinstance(rc, str) and rc.startswith("{"):
+                        parsed_rc = _json.loads(rc)
+                        collection = parsed_rc.get("collection", "")
+                        doc_ids_cited = list(set(
+                            c.get("doc_id", "") for c in parsed_rc.get("chunks", []) if c.get("doc_id")
+                        ))
             except (_json.JSONDecodeError, TypeError):
                 pass
 
-        # Parse chunk details from tag
+        # --- Chunk details from tag ---
         chunks = []
         chunks_json = tags.get("chunks_detail", "")
         if chunks_json:
@@ -661,3 +696,20 @@ def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[Tra
     except Exception as e:
         logger.warning(f"Failed to extract trace summary: {e}")
         return None
+
+
+def _extract_collection_from_raw(inputs_raw: str, outputs_raw: str) -> str:
+    """Extract collection name from tool_call arguments in raw trace JSON.
+
+    Searches for milvus_search tool calls and extracts the collection parameter.
+    Works even when the JSON is truncated.
+    """
+    import re as _re
+
+    for raw in (inputs_raw, outputs_raw):
+        m = _re.search(r'"collection":\s*"([^"]+)"', raw)
+        if m:
+            val = m.group(1)
+            if val not in ("", "messages", "tools"):
+                return val
+    return ""
