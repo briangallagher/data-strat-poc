@@ -78,6 +78,17 @@ High-level decisions made during the project. For significant architectural deci
 
 **Consequences:** Easy identification of project resources at a glance. Simplifies cleanup (`oc get ns | grep data-strat-`). Consistent with the repo name. All manifests, getting-started docs, runbooks, and scripts must use this prefix — never hardcode a namespace without it.
 
+### DEC-006: Git tagging convention for milestones and phases
+**Date:** 2026-05-25
+**Milestone:** M1
+**Status:** Decided
+
+**Context:** The project spans multiple repos (`data-strat-poc` for docs/manifests and `pipelines-components` fork for component code). When a milestone or phase is verified, we need a way to recreate that exact state across all repos — for rollback, comparison, or onboarding.
+
+**Decision:** Use lightweight git tags with the pattern `m<N>-p<P>` (e.g., `m1-p0`, `m1-p2`, `m1-complete`) applied simultaneously to all project repos at each verified checkpoint. Tags are permanent and never moved.
+
+**Consequences:** Any checkpoint can be recreated by checking out the same tag across all repos. Enables rollback after broken changes. Makes it easy to diff between phases (`git diff m1-p1..m1-p2`). Requires discipline to tag all repos together — a missed tag on one repo breaks the contract.
+
 ### DEC-007: Data-chain-only ingest pipeline for M1–M3
 **Date:** 2026-05-25
 **Milestone:** M1
@@ -197,14 +208,3 @@ The Registry backend gains federation endpoints that call MLflow API (trace sear
 Users never need to open Marquez, MLflow, or a terminal. Deep links to those systems are available for engineers who want the underlying detail.
 
 **Consequences:** The Registry evolves from a document metadata store to a provenance portal. Its backend now depends on MLflow and Marquez APIs being reachable. Need graceful degradation when backends are down (show what's available, flag what's unavailable). M5 adds Collection Health, App Overview, and Impact Analysis views when more apps exist.
-
-### DEC-006: Git tagging convention for milestones and phases
-**Date:** 2026-05-25
-**Milestone:** M1
-**Status:** Decided
-
-**Context:** The project spans multiple repos (`data-strat-poc` for docs/manifests and `pipelines-components` fork for component code). When a milestone or phase is verified, we need a way to recreate that exact state across all repos — for rollback, comparison, or onboarding.
-
-**Decision:** Use lightweight git tags with the pattern `m<N>-p<P>` (e.g., `m1-p0`, `m1-p2`, `m1-complete`) applied simultaneously to all project repos at each verified checkpoint. Tags are permanent and never moved.
-
-**Consequences:** Any checkpoint can be recreated by checking out the same tag across all repos. Enables rollback after broken changes. Makes it easy to diff between phases (`git diff m1-p1..m1-p2`). Requires discipline to tag all repos together — a missed tag on one repo breaks the contract.

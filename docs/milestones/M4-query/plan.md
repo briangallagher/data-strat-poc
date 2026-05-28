@@ -1,7 +1,7 @@
 # M4 Plan: Query Layer (Deterministic RAG)
 
 **Date:** 2026-05-27
-**Status:** Planning
+**Status:** Complete
 **Depends on:** M3 (complete)
 
 ## Objective
@@ -50,10 +50,10 @@ User (Browser)
 │  MCP Server  │────────────────┘
 │  (milvus     │
 │   search)    │       ┌──────────────────┐
-│              │──────→│  Embedding ISVC  │
-└──────────────┘ embed │  (Granite 125M   │
-                 query │   via vLLM)      │
-       │               └──────────────────┘
+│              │──────→│  Local Embedding  │
+└──────────────┘ embed │  (Granite 125M    │
+                 query │   sentence-xfmrs) │
+       │               └───────────────────┘
        │
        │ mlflow.langchain.autolog()
        ▼
@@ -233,16 +233,24 @@ These views are valuable but not essential for M4's core "answer provenance" goa
 
 **No changes to:** Marquez, Milvus, ingest pipeline, existing MLflow.
 
-## Production Gaps (Expected)
+## Production Gaps (Actual)
+
+See [production-gaps.md](../../production-gaps.md) for the full register (PG-042 through PG-053 added in M4).
 
 | ID | Gap | Notes |
 |----|-----|-------|
-| PG-042+ | No auth on Chainlit beyond basic | OAuth proxy or OIDC needed for production |
-| PG-043+ | Single LLM instance, no HA | Scaling/failover for vLLM serving |
-| PG-044+ | No rate limiting on query service | Protect LLM from abuse |
-| PG-045+ | No response caching | Repeated identical queries hit LLM each time |
-| PG-046+ | No guardrails/safety filters | LLM can be prompted outside underwriting domain |
-| PG-047 | ~~LLM occasionally skips tool call~~ | **Resolved:** Restructured from ReAct agent (LLM decides) to deterministic RAG graph (application always retrieves first). Retrieve → Generate pipeline — no LLM decision on whether to search. |
+| PG-042 | No auth on Chainlit beyond basic | OAuth proxy or OIDC needed for production |
+| PG-043 | Single LLM instance, no HA | Scaling/failover for vLLM serving |
+| PG-044 | No rate limiting on query service | Protect LLM from abuse |
+| PG-045 | No response caching | Repeated identical queries hit LLM each time |
+| PG-046 | No guardrails/safety filters | LLM can be prompted outside underwriting domain |
+| PG-047 | ~~LLM occasionally skips tool call~~ | **Closed:** Restructured from ReAct agent to deterministic RAG graph (retrieve → generate). |
+| PG-048 | RHOAI MLflow lacks trace delete API | Upstream feature request needed |
+| PG-049 | MLflow `traceOutputs` truncated at 250 chars | Upstream bug |
+| PG-050 | Chainlit incompatible with Python 3.14 | Pin to Python 3.12/3.13 |
+| PG-051 | MLflow workspace header requires monkeypatch | Mitigated via `mlflow_config.py` |
+| PG-052 | Port-forward instability for local dev | Deploy on cluster to resolve |
+| PG-053 | Query service not yet deployed on cluster | M5 task |
 
 ## What M4 Does NOT Include
 

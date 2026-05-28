@@ -39,7 +39,7 @@ M2 adds pipeline observability and data lineage via `rhoai-lineage` library, Mar
 ## Principles
 
 - **Verify Before You Advance** — no milestone signs off without E2E verification at two scales
-- **Production-Grade from Day One** — deviations tracked in [production-gaps.md](../production-gaps.md) (25 gaps, 2 mitigated)
+- **Production-Grade from Day One** — deviations tracked in [production-gaps.md](../production-gaps.md) (53 gaps, 10 closed/mitigated)
 - **Document as You Go** — each milestone produces ADRs, technical deep dives, and runbooks alongside the code
 - **Pause/Resume Friendly** — each checkpoint has enough context for a cold start
 
@@ -55,12 +55,15 @@ The plan is written before building starts. The checkpoint is written after veri
 
 ## Key Decisions
 
-| ADR | Decision | Milestone |
-|-----|----------|-----------|
+| ADR/DEC | Decision | Milestone |
+|---------|----------|-----------|
 | [ADR-002](../architecture/adrs/ADR-002-chunking-milvus-schema.md) | HNSW index, 10-field schema with lineage + P&C metadata | M1 |
-| [ADR-003](../architecture/adrs/ADR-003-ogx-role.md) | Direct Milvus writes for ingest; OGX reserved for query (M4) | M0 |
+| [ADR-003](../architecture/adrs/ADR-003-ogx-role.md) | Direct Milvus writes for ingest; OGX reserved for query path (amended by DEC-010) | M0 |
 | [ADR-004](../architecture/adrs/ADR-004-lineage-architecture.md) | Fork-and-adapt rhoai-lineage; bridge OFF by default; operator deferred | M2 |
 | [ADR-007](../architecture/adrs/ADR-007-multi-repo-strategy.md) | Start in integration hub; extract when interfaces stabilise | M0 |
+| [DEC-009](../decisions.md) | Two-layer lineage: Marquez for ingest, MLflow traces for query | M4 |
+| [DEC-010](../decisions.md) | LangGraph + MCP + MLflow autolog for M4; OGX reserved for M5 agentic RAG | M4 |
+| [DEC-011](../decisions.md) | Registry UI as unified provenance portal | M4 |
 
 ## Where Things Live
 
@@ -75,6 +78,11 @@ The plan is written before building starts. The checkpoint is written after veri
 | Production gaps | [production-gaps.md](../production-gaps.md) |
 | Prior art synthesis | [prior-art-synthesis.md](../working/prior-art-synthesis.md) |
 | Phase 0 lessons learned | [m1-phase0-lessons-learned.md](../working/m1-phase0-lessons-learned.md) |
+| Query service (MCP + LangGraph + Chainlit) | `src/query/` |
+| Registry provenance endpoints | `src/registry/provenance.py` |
+| Registry UI (with provenance portal) | `src/registry-ui/` |
+| Model serving manifests | `manifests/model-serving/` |
+| Assessment docs (Scenario B, feedback, ET questions) | `docs/assessment/` |
 | Marquez Web UI | https://marquez-web-data-strat-poc.apps.dev.aip-ft.rh-ods.com |
 | Marquez API | https://marquez-data-strat-poc.apps.dev.aip-ft.rh-ods.com |
 | MLflow UI | https://mlflow-ui-redhat-ods-applications.apps.dev.aip-ft.rh-ods.com |

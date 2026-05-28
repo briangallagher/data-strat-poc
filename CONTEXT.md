@@ -74,7 +74,23 @@ _Avoid_: process_documents
 The third KFP component. Embeds chunks and writes vectors to the target Milvus collection.
 _Avoid_: embed_and_store, vectorize
 
-## Example Dialogue
+### Query
+
+**Application**:
+A named query service that consumes one or more **Collections** via Milvus search and serves answers to users. Each Application is registered in Marquez as an OpenLineage job with its consumed Collections as inputs. Examples: `underwriter_chat`, `compliance_review_agent`.
+_Avoid_: Agent (overloaded — refers to the LLM orchestration pattern, not the deployed service), Service (too generic)
+
+**Deterministic Query Workflow**:
+A query workflow where the application controls retrieval — the code decides what to search, when, and how many times. The LLM generates an answer from the retrieved context but does not decide the retrieval strategy. Workflow A in Scenario B.
+_Avoid_: Simple RAG, Basic RAG (implies inferior — deterministic is a deliberate design choice)
+
+**Agentic Query Workflow**:
+A query workflow where the LLM autonomously decides what to retrieve. The agent plans a retrieval strategy, executes multiple searches across different **Collections**, cross-references results, and synthesizes an answer. Workflow B in Scenario B.
+_Avoid_: Multi-hop RAG (describes one technique, not the full pattern), Advanced RAG
+
+## Example Dialogues
+
+### Ingest
 
 **Domain expert (underwriting ops):** "We just got 3 new California bulletins from the DOI. They need to go into the regulatory collection."
 
@@ -87,3 +103,17 @@ _Avoid_: embed_and_store, vectorize
 **Domain expert:** "And if California moves the bulletin URL next month?"
 
 **Developer:** "The `doc_id` stays the same — we just update the `source_url` in the registry. All existing lineage and vectors still reference the same identity. That's what the registry is for."
+
+### Query
+
+**Compliance officer:** "The agent reviewed our GL guidelines and flagged 3 deviations from the ISO CG 00 01 standard. How do I know it actually checked the right documents?"
+
+**Developer:** "Every query creates an MLflow trace. Open the Registry UI, go to Queries, and click the trace. It shows which collections were searched — in this case `underwriting_guidelines` and `iso_forms` — which doc_ids were cited, and the pipeline_run_id for each retrieved chunk."
+
+**Compliance officer:** "And the pipeline_run_id tells me what?"
+
+**Developer:** "It links back to the exact ingest run that created those vectors. Click through to the Marquez lineage graph and you can see the full chain — which source files were fetched, when they were parsed, and when they were embedded into Milvus. So you can verify the agent was working with the January 2026 version of the GL guidelines, not an older one."
+
+**Compliance officer:** "What if I want to know every query that ever cited a specific document?"
+
+**Developer:** "That's the reverse lookup. Go to the document's provenance page in the Registry UI — it shows every query trace that cited that doc_id. You can see who asked what, when, and what answer they got."

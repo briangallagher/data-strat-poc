@@ -61,11 +61,11 @@ Specific choices:
 
 ## Future Considerations
 
-- **Bridge evaluation (M4):** When query-time tracing is implemented via MLflow GenAI spans, re-evaluate the bridge for combining inference traces with pipeline lineage in a single Marquez view.
+- **~~Bridge evaluation (M4):~~** Resolved in M4 — DEC-009 established the two-layer architecture (Marquez for ingest, MLflow traces for query). The bridge remains OFF. Query-time lineage goes to MLflow traces, not Marquez. No re-evaluation needed.
 - **Marquez auth (M5):** Deploy OAuth proxy sidecar for production multi-tenant access (PG-001).
 - **PyPI package (post-POC):** Replace git-install with published wheel once rhoai-lineage API stabilises (closes PG-021).
-- **Parent run facet:** Emit KFP `pipeline_run_id` as an OpenLineage `parent` run facet to enable cross-system correlation in Marquez (closes PG-025).
-- **Lineage operator (M4/M5):** Deploy for agent-level lineage when OGX query path is implemented.
+- **~~Parent run facet:~~** PG-025 closed in M2 — `pipelineRunId` custom run facet added to rhoai-lineage OL emission.
+- **Lineage operator (M5):** Deploy for agent-level lineage when OGX query path is implemented. Deferred from M4 (DEC-010 chose LangGraph, not OGX).
 - **OpenMetadata evaluation (M5+):** If Marquez's lack of auth and limited UI become blockers, evaluate OpenMetadata as a replacement.
 
 ## References

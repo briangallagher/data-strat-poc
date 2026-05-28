@@ -61,13 +61,20 @@
 
 ## Production Gaps Identified
 
-| ID | Gap | Path to Close |
-|----|-----|---------------|
-| PG-047 | LLM occasionally skips tool call | Prompt engineering or forced first tool call; Granite 8B sometimes answers from parametric knowledge without searching |
-| PG-018 | Embedding ISVC blocked | RHOAI 3.4 vLLM lacks `--task=embedding`; using local sentence-transformers; re-evaluate on RHOAI 3.5+ |
-| PG-019 | Embedding model downloads per startup | MCP server downloads Granite Embedding 125M on each restart; pre-cache on PVC or use ISVC when available |
-| — | MLflow cluster auth for traces | Traces log locally; cluster MLflow requires SA token + `X-Mlflow-Workspace` header; deployment-time config |
-| — | Chainlit not yet deployed on cluster | Runs locally; needs pod deployment with route |
+See [production-gaps.md](../../production-gaps.md) for the full register. M4 added PG-042 through PG-053.
+
+| ID | Gap | Status |
+|----|-----|--------|
+| PG-047 | LLM occasionally skipped tool call (ReAct agent) | **Closed** — Restructured to deterministic RAG graph (retrieve → generate) |
+| PG-018 | Embedding ISVC blocked (RHOAI 3.4 vLLM lacks `--task=embedding`) | Mitigated — using local sentence-transformers; re-evaluate on RHOAI 3.5+ |
+| PG-019 | Embedding model downloads per startup | Open — MCP server downloads Granite Embedding 125M on each restart |
+| PG-009 | No query/response audit logging | **Closed** — MLflow autolog captures full traces with doc_ids, pipeline_run_ids |
+| PG-048 | RHOAI MLflow lacks trace delete API | Open — upstream feature request |
+| PG-049 | MLflow `traceOutputs` metadata truncated at 250 chars | Open — upstream bug |
+| PG-050 | Chainlit incompatible with Python 3.14 (asyncio) | Open — pin to Python 3.12/3.13 |
+| PG-051 | MLflow workspace header requires monkeypatch (`mlflow_config.py`) | Mitigated |
+| PG-052 | Port-forward instability for local dev | Open — deploy on cluster to resolve |
+| PG-053 | Query service not yet deployed on cluster | Open — M5 deployment task |
 
 ## Cluster State After M4
 
