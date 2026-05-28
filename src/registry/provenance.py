@@ -657,7 +657,8 @@ def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[Tra
         doc_ids_cited = [d for d in tags.get("doc_ids_cited", "").split(",") if d]
         collection = tags.get("collection_queried", "")
 
-        if not answer_preview and tags.get("answer_preview"):
+        # Tag-based answer is preferred (not truncated by MLflow API limits)
+        if tags.get("answer_preview"):
             answer_preview = tags["answer_preview"]
 
         # --- Collection from tool_calls in traceInputs or traceOutputs ---
