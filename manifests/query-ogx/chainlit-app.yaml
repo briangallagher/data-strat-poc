@@ -43,6 +43,13 @@ spec:
               value: "https://mlflow.redhat-ods-applications.svc.cluster.local:8443"
             - name: MLFLOW_TRACKING_INSECURE_TLS
               value: "true"
+            - name: MLFLOW_TRACKING_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-token
+                  key: token
+            - name: MLFLOW_WORKSPACE
+              value: "data-strat-poc"
             - name: MLFLOW_EXPERIMENT_NAME
               value: "compliance-review-agent"
             - name: MARQUEZ_API_URL

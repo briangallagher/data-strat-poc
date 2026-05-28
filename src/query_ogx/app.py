@@ -23,6 +23,10 @@ import chainlit as cl
 import mlflow
 from mcp import ClientSession
 from mcp.client.sse import sse_client
+from mlflow.tracking.request_header.abstract_request_header_provider import (
+    RequestHeaderProvider,
+)
+from mlflow.tracking.request_header.registry import _request_header_provider_registry
 from openai import OpenAI
 
 logging.basicConfig(
@@ -37,9 +41,29 @@ OGX_MODEL = os.environ.get("OGX_MODEL", "granite-3.3-8b-instruct")
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://localhost:8000/sse")
 MLFLOW_TRACKING_URI = os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000")
 MLFLOW_EXPERIMENT_NAME = os.environ.get("MLFLOW_EXPERIMENT_NAME", "compliance-review-agent")
+MLFLOW_WORKSPACE = os.environ.get("MLFLOW_WORKSPACE", "data-strat-poc")
 MAX_INFER_ITERS = int(os.environ.get("MAX_INFER_ITERS", "10"))
 
 TOOL_CALL_PATTERN = re.compile(r"<\|tool_call\|>\s*(\[.*?\])", re.DOTALL)
+CODEBLOCK_TOOL_CALL = re.compile(
+    r"```(?:json|python)?\s*\{[^}]*\"(?:function_call|name)\"[^}]*\}\s*```", re.DOTALL
+)
+
+
+class _RHOAIMLflowHeaders(RequestHeaderProvider):
+    """Injects X-Forwarded-Access-Token and workspace headers for RHOAI MLflow."""
+
+    def in_context(self):
+        return bool(os.environ.get("MLFLOW_TRACKING_TOKEN"))
+
+    def request_headers(self):
+        return {
+            "X-Forwarded-Access-Token": os.environ.get("MLFLOW_TRACKING_TOKEN", ""),
+            "X-MLflow-Workspace": MLFLOW_WORKSPACE,
+        }
+
+
+_request_header_provider_registry.register(_RHOAIMLflowHeaders)
 
 MCP_TOOLS = [
     {
@@ -137,15 +161,36 @@ def get_ogx_client() -> OpenAI:
 
 
 def _parse_tool_calls(text: str) -> list[dict]:
-    """Parse Granite's <|tool_call|> format from model output."""
+    """Parse tool calls from model text output.
+
+    Handles Granite <|tool_call|> tokens and code-block JSON in various
+    formats the model may produce (function_call, name, function keys).
+    """
     match = TOOL_CALL_PATTERN.search(text)
-    if not match:
-        return []
-    try:
-        calls = json.loads(match.group(1))
-        return calls if isinstance(calls, list) else [calls]
-    except (json.JSONDecodeError, TypeError):
-        return []
+    if match:
+        try:
+            calls = json.loads(match.group(1))
+            return calls if isinstance(calls, list) else [calls]
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    blocks = re.findall(r"```(?:json|python)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    for block in blocks:
+        try:
+            obj = json.loads(block)
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+        if "function_call" in obj:
+            fc = obj["function_call"]
+            return [{"name": fc.get("name", ""), "arguments": fc.get("arguments", {})}]
+
+        name = obj.get("name") or obj.get("function") or ""
+        args = obj.get("arguments") or obj.get("parameters") or {}
+        if name and name in {t["function"]["name"] for t in MCP_TOOLS}:
+            return [{"name": name, "arguments": args}]
+
+    return []
 
 
 def _strip_tool_call_text(text: str) -> str:
@@ -217,11 +262,12 @@ async def on_message(message: cl.Message):
 
     try:
         for iteration in range(MAX_INFER_ITERS):
+            tc_mode = "required" if iteration == 0 else "auto"
             response = client.chat.completions.create(
                 model=OGX_MODEL,
                 messages=messages,
                 tools=MCP_TOOLS,
-                tool_choice="auto",
+                tool_choice=tc_mode,
                 temperature=0,
                 max_tokens=4096,
             )
@@ -229,7 +275,14 @@ async def on_message(message: cl.Message):
             choice = response.choices[0]
             text = choice.message.content or ""
 
-            parsed_calls = _parse_tool_calls(text)
+            structured_calls = choice.message.tool_calls or []
+            if structured_calls:
+                parsed_calls = [
+                    {"name": tc.function.name, "arguments": json.loads(tc.function.arguments)}
+                    for tc in structured_calls
+                ]
+            else:
+                parsed_calls = _parse_tool_calls(text)
 
             if not parsed_calls:
                 clean_text = _strip_tool_call_text(text)
