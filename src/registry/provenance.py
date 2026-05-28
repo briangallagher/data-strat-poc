@@ -610,6 +610,7 @@ def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[Tra
                 question = m.group(1)[:200]
 
         # --- Answer: handle both chat completion and message-list formats ---
+        # MLflow truncates traceOutputs to 250 chars, so also try regex fallback
         outputs_raw = metadata_dict.get("mlflow.traceOutputs", "{}")
         try:
             outputs = _json.loads(outputs_raw)
@@ -629,7 +630,13 @@ def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[Tra
                         answer_preview = content[:500]
                         break
         except (_json.JSONDecodeError, TypeError, IndexError):
-            pass
+            # Truncated JSON — extract content after "content": "
+            m = _re.search(r'"content":\s*"(.+)', outputs_raw)
+            if m:
+                raw_answer = m.group(1)
+                if raw_answer.endswith('...'):
+                    raw_answer = raw_answer[:-3] + "..."
+                answer_preview = raw_answer[:500]
 
         # --- Tags ---
         tags = {}
@@ -699,17 +706,31 @@ def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[Tra
 
 
 def _extract_collection_from_raw(inputs_raw: str, outputs_raw: str) -> str:
-    """Extract collection name from tool_call arguments in raw trace JSON.
+    """Extract collection name from trace JSON, trying multiple strategies.
 
-    Searches for milvus_search tool calls and extracts the collection parameter.
-    Works even when the JSON is truncated.
+    1. Look for "collection": "..." in tool_call arguments
+    2. Look for known collection names mentioned in the user's question text
     """
     import re as _re
 
+    # Strategy 1: JSON key match
     for raw in (inputs_raw, outputs_raw):
         m = _re.search(r'"collection":\s*"([^"]+)"', raw)
         if m:
             val = m.group(1)
             if val not in ("", "messages", "tools"):
                 return val
+
+    # Strategy 2: known collection names in text (MLflow truncates to 250 chars)
+    combined = inputs_raw + outputs_raw
+    known_collections = [
+        "underwriting_guidelines",
+        "iso_forms",
+        "regulatory_bulletins",
+        "claims_procedures",
+    ]
+    for coll in known_collections:
+        if coll in combined:
+            return coll
+
     return ""
