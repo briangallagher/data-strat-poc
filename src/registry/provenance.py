@@ -604,18 +604,19 @@ def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[Tra
         for meta in trace.get("request_metadata", []):
             metadata_dict[meta.get("key", "")] = meta.get("value", "")
 
-        # --- Question: find the last user message in traceInputs ---
+        # --- Question: find the last user/human message in traceInputs ---
         inputs_raw = metadata_dict.get("mlflow.traceInputs", "{}")
         try:
             inputs = _json.loads(inputs_raw)
             msgs = inputs.get("messages", [])
             for msg in reversed(msgs):
-                if msg.get("role") == "user":
+                role = msg.get("role", "")
+                msg_type = msg.get("type", "")
+                if role == "user" or msg_type == "human":
                     question = msg.get("content", "")[:200]
                     break
         except (_json.JSONDecodeError, TypeError, IndexError):
-            # JSON may be truncated by MLflow size limits — regex fallback
-            m = _re.search(r'"role":\s*"user",\s*"content":\s*"([^"]+)', inputs_raw)
+            m = _re.search(r'"content":\s*"([^"]{10,})', inputs_raw)
             if m:
                 question = m.group(1)[:200]
 
