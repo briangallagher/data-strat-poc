@@ -543,43 +543,31 @@ async def list_apps():
     for trace in traces:
         tags = {t.get("key", ""): t.get("value", "") for t in trace.get("tags", [])}
         trace_app = tags.get("app_name", "")
-        if trace_app and trace_app in app_map:
-            app_map[trace_app].query_count += 1
-            ts = str(trace.get("timestamp_ms", ""))
-            if ts and (app_map[trace_app].last_query is None or ts > app_map[trace_app].last_query):
-                app_map[trace_app].last_query = ts
-            wf = tags.get("workflow", "")
-            if wf:
-                app_map[trace_app].workflow_type = wf
+        if not trace_app:
+            continue
 
-    if not app_map:
-        known_apps = [
-            AppInfo(
-                app_name="underwriter_chat",
-                collections=["underwriting_guidelines"],
-                query_count=len([
-                    t for t in traces
-                    if any(tag.get("value") == "underwriter_chat"
-                           for tag in t.get("tags", [])
-                           if tag.get("key") == "app_name")
-                ]),
+        # Discover apps from traces even if not in Marquez
+        if trace_app not in app_map:
+            colls = [c for c in tags.get("collection_queried", "").split(",") if c]
+            app_map[trace_app] = AppInfo(
+                app_name=trace_app,
+                collections=colls,
+                query_count=0,
                 last_query=None,
-                workflow_type="deterministic",
-            ),
-            AppInfo(
-                app_name="compliance_review_agent",
-                collections=["underwriting_guidelines", "iso_forms", "regulatory_bulletins"],
-                query_count=len([
-                    t for t in traces
-                    if any(tag.get("value") == "compliance_review_agent"
-                           for tag in t.get("tags", [])
-                           if tag.get("key") == "app_name")
-                ]),
-                last_query=None,
-                workflow_type="agentic",
-            ),
-        ]
-        return known_apps
+                workflow_type=tags.get("workflow", "unknown"),
+            )
+
+        app_map[trace_app].query_count += 1
+        ts = str(trace.get("timestamp_ms", ""))
+        if ts and (app_map[trace_app].last_query is None or ts > app_map[trace_app].last_query):
+            app_map[trace_app].last_query = ts
+        wf = tags.get("workflow", "")
+        if wf:
+            app_map[trace_app].workflow_type = wf
+        # Merge any new collections seen in traces
+        for c in tags.get("collection_queried", "").split(","):
+            if c and c not in app_map[trace_app].collections:
+                app_map[trace_app].collections.append(c)
 
     return list(app_map.values())
 
