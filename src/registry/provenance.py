@@ -272,7 +272,7 @@ async def get_document_provenance(doc_id: str):
                     job_name=job_name,
                     run_id=run.get("id", ""),
                     namespace=MARQUEZ_NAMESPACE,
-                    url=f"{MARQUEZ_API_URL}/lineage/{MARQUEZ_NAMESPACE}/{job_name}",
+                    url=f"{MARQUEZ_WEB_URL}/lineage/job/{MARQUEZ_NAMESPACE}/{job_name}",
                 ))
 
         traces = await _search_mlflow_traces()
@@ -372,7 +372,7 @@ async def get_collection_provenance(collection_name: str):
                         job_name=job["name"],
                         run_id="",
                         namespace=job.get("namespace", MARQUEZ_NAMESPACE),
-                        url=f"{MARQUEZ_API_URL}/lineage/{MARQUEZ_NAMESPACE}/{job['name']}",
+                        url=f"{MARQUEZ_WEB_URL}/lineage/job/{MARQUEZ_NAMESPACE}/{job['name']}",
                     ))
 
         traces = await _search_mlflow_traces()
@@ -408,7 +408,7 @@ async def get_external_links():
         "marquez_web": MARQUEZ_WEB_URL,
         "marquez_api": MARQUEZ_API_URL,
         "mlflow": MLFLOW_EXTERNAL_URL,
-        "marquez_lineage": f"{MARQUEZ_WEB_URL}/lineage/{MARQUEZ_NAMESPACE}",
+        "marquez_lineage": MARQUEZ_WEB_URL,
     }
 
 
@@ -484,7 +484,7 @@ async def get_collection_health(collection_name: str):
                         job_name=app_name,
                         run_id="",
                         namespace=job.get("namespace", MARQUEZ_NAMESPACE),
-                        url=f"{MARQUEZ_API_URL}/lineage/{MARQUEZ_NAMESPACE}/{app_name}",
+                        url=f"{MARQUEZ_WEB_URL}/lineage/job/{MARQUEZ_NAMESPACE}/{app_name}",
                     ))
 
         traces = await _search_mlflow_traces()
