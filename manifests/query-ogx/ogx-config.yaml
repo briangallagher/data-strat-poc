@@ -11,23 +11,37 @@ data:
     version: "2"
     image_name: rh
     apis:
-    - agents
+    - responses
+    - datasetio
+    - files
     - inference
+    - safety
+    - scoring
     - tool_runtime
+    - vector_io
     providers:
       inference:
+      - provider_id: sentence-transformers
+        provider_type: inline::sentence-transformers
+        config: {}
       - provider_id: vllm-granite
         provider_type: remote::vllm
         config:
           api_token: ${env.VLLM_API_TOKEN:=fake}
           max_tokens: ${env.VLLM_MAX_TOKENS:=4096}
-          tls_verify: false
-          url: http://granite-llm-predictor.data-strat-poc.svc.cluster.local:8080/v1
-      agents:
-      - provider_id: meta-reference
-        provider_type: inline::meta-reference
+          base_url: http://granite-llm-predictor.data-strat-poc.svc.cluster.local:8080/v1
+      vector_io:
+      - provider_id: milvus
+        provider_type: inline::milvus
         config:
-          max_infer_iters: 20
+          db_path: /opt/app-root/src/.llama/distributions/rh/milvus.db
+          persistence:
+            backend: kv_default
+            namespace: vector_io::milvus
+      responses:
+      - provider_id: builtin
+        provider_type: inline::builtin
+        config:
           persistence:
             agent_state:
               backend: kv_default
@@ -35,6 +49,29 @@ data:
             responses:
               backend: sql_default
               table_name: responses
+      eval: []
+      files:
+      - provider_id: meta-reference-files
+        provider_type: inline::localfs
+        config:
+          metadata_store:
+            backend: sql_default
+            table_name: files_metadata
+          storage_dir: /opt/app-root/src/.llama/distributions/rh/files
+      datasetio:
+      - provider_id: huggingface
+        provider_type: remote::huggingface
+        config:
+          kvstore:
+            backend: kv_default
+            namespace: datasetio::huggingface
+      scoring:
+      - provider_id: basic
+        provider_type: inline::basic
+        config: {}
+      - provider_id: llm-as-judge
+        provider_type: inline::llm-as-judge
+        config: {}
       tool_runtime:
       - provider_id: model-context-protocol
         provider_type: remote::model-context-protocol
@@ -62,6 +99,12 @@ data:
           namespace: registry
     registered_resources:
       models:
+      - provider_id: sentence-transformers
+        model_id: sentence-transformers/ibm-granite/granite-embedding-125m-english
+        provider_model_id: ibm-granite/granite-embedding-125m-english
+        model_type: embedding
+        metadata:
+          embedding_dimension: 768
       - provider_id: vllm-granite
         model_id: granite-3.3-8b-instruct
         provider_model_id: granite-llm

@@ -1,19 +1,28 @@
 """Chainlit chat application for the agentic compliance review assistant.
 
-Workflow B: The OGX agent autonomously decides which collections to search,
+Workflow B: The agent autonomously decides which collections to search,
 performs multi-hop retrieval, cross-references findings, and produces a
-structured compliance analysis. The client is thin — OGX handles the entire
-agent loop server-side via its Responses API.
+structured compliance analysis.
 
-Uses the OpenAI Python client against OGX's OpenAI-compatible endpoint.
+Uses OGX (LlamaStack) as the inference + MCP tool runtime. The client
+manages the agentic loop: each iteration sends context to OGX, which
+returns either a tool call or a final answer. Tool calls are executed
+against the MCP server, and results are fed back for the next iteration.
+
+Architecture: Chainlit → OGX (Responses API + MCP discovery) → Granite vLLM
+                                    ↕
+                              MCP Server (SSE) → Milvus
 """
 
 import json
 import logging
 import os
+import re
 
 import chainlit as cl
 import mlflow
+from mcp import ClientSession
+from mcp.client.sse import sse_client
 from openai import OpenAI
 
 logging.basicConfig(
@@ -29,6 +38,66 @@ MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://localhost:8000/sse")
 MLFLOW_TRACKING_URI = os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000")
 MLFLOW_EXPERIMENT_NAME = os.environ.get("MLFLOW_EXPERIMENT_NAME", "compliance-review-agent")
 MAX_INFER_ITERS = int(os.environ.get("MAX_INFER_ITERS", "10"))
+
+TOOL_CALL_PATTERN = re.compile(r"<\|tool_call\|>\s*(\[.*?\])", re.DOTALL)
+
+MCP_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "list_collections",
+            "description": (
+                "List available document collections in the underwriting knowledge base. "
+                "Returns collection names and descriptions. Call this first to understand "
+                "what knowledge sources are available before searching."
+            ),
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "milvus_search",
+            "description": (
+                "Search a document collection using semantic similarity. "
+                "Returns document chunks ranked by relevance, with full metadata "
+                "including doc_id, pipeline_run_id, and source text for citation."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Natural language question to search for.",
+                    },
+                    "collection": {
+                        "type": "string",
+                        "description": (
+                            "Collection to search. Must be one of: underwriting_guidelines, "
+                            "iso_forms, regulatory_bulletins."
+                        ),
+                    },
+                    "top_k": {
+                        "type": "integer",
+                        "description": "Number of results (1-50). Defaults to 10.",
+                        "default": 10,
+                    },
+                    "category_filter": {
+                        "type": "string",
+                        "description": "Optional filter by document category.",
+                        "default": "",
+                    },
+                    "subcategory_filter": {
+                        "type": "string",
+                        "description": "Optional filter by subcategory.",
+                        "default": "",
+                    },
+                },
+                "required": ["query", "collection"],
+            },
+        },
+    },
+]
 
 SYSTEM_PROMPT = """You are an expert insurance compliance review agent. Your job is to analyze
 underwriting guidelines against ISO standard forms and regulatory requirements.
@@ -50,21 +119,52 @@ For each finding, cite the source document (doc_id) and the relevant text.
 Be thorough but concise. If you can't find relevant information in a collection,
 say so explicitly rather than guessing."""
 
-if MLFLOW_TRACKING_URI:
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    logger.info(f"MLflow tracking URI: {MLFLOW_TRACKING_URI}")
-
-mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
-mlflow.openai.autolog()
+MLFLOW_ENABLED = False
+try:
+    if MLFLOW_TRACKING_URI:
+        mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+        logger.info(f"MLflow tracking URI: {MLFLOW_TRACKING_URI}")
+    mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
+    mlflow.openai.autolog()
+    MLFLOW_ENABLED = True
+    logger.info("MLflow tracking enabled")
+except Exception as e:
+    logger.warning(f"MLflow initialization failed (tracing disabled): {e}")
 
 
 def get_ogx_client() -> OpenAI:
     return OpenAI(base_url=OGX_BASE_URL, api_key=OGX_API_KEY)
 
 
+def _parse_tool_calls(text: str) -> list[dict]:
+    """Parse Granite's <|tool_call|> format from model output."""
+    match = TOOL_CALL_PATTERN.search(text)
+    if not match:
+        return []
+    try:
+        calls = json.loads(match.group(1))
+        return calls if isinstance(calls, list) else [calls]
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+
+def _strip_tool_call_text(text: str) -> str:
+    """Remove <|tool_call|> markers and JSON from display text."""
+    return TOOL_CALL_PATTERN.sub("", text).strip()
+
+
+async def _execute_tool(name: str, arguments: dict) -> str:
+    """Execute a tool call against the MCP server via SSE transport."""
+    async with sse_client(MCP_SERVER_URL) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool(name, arguments)
+            texts = [c.text for c in result.content if hasattr(c, "text")]
+            return "\n".join(texts) if texts else json.dumps({"status": "no content"})
+
+
 @cl.set_starters
 async def set_starters():
-    """Conversation starters demonstrating Workflow B (agentic compliance review)."""
     return [
         cl.Starter(
             label="GL Compliance Review",
@@ -95,96 +195,99 @@ async def set_starters():
 
 @cl.on_chat_start
 async def start_chat():
-    """Initialize the OGX client for this session."""
     client = get_ogx_client()
     cl.user_session.set("ogx_client", client)
 
 
 @cl.on_message
 async def on_message(message: cl.Message):
-    """Handle user message: agentic compliance review via OGX Responses API."""
+    """Agentic compliance review with client-side tool execution loop."""
     client: OpenAI = cl.user_session.get("ogx_client")
     if not client:
         client = get_ogx_client()
         cl.user_session.set("ogx_client", client)
 
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": message.content},
+    ]
+
     tool_calls_seen = []
     search_results_raw = []
 
     try:
-        response = client.responses.create(
-            model=OGX_MODEL,
-            instructions=SYSTEM_PROMPT,
-            input=message.content,
-            tools=[
-                {
-                    "type": "mcp",
-                    "server_label": "knowledge_base",
-                    "server_url": MCP_SERVER_URL,
-                }
-            ],
-            tool_choice="auto",
-            temperature=0,
-        )
+        for iteration in range(MAX_INFER_ITERS):
+            response = client.chat.completions.create(
+                model=OGX_MODEL,
+                messages=messages,
+                tools=MCP_TOOLS,
+                tool_choice="auto",
+                temperature=0,
+                max_tokens=4096,
+            )
 
-        # Walk the response output items to extract tool calls and final text
-        answer_text = ""
-        for item in response.output:
-            item_type = getattr(item, "type", None)
+            choice = response.choices[0]
+            text = choice.message.content or ""
 
-            if item_type == "function_call":
-                name = getattr(item, "name", "unknown")
-                arguments = getattr(item, "arguments", "{}")
-                call_id = getattr(item, "call_id", "")
+            parsed_calls = _parse_tool_calls(text)
 
-                tool_calls_seen.append({
-                    "name": name,
-                    "arguments": arguments,
-                    "call_id": call_id,
-                })
+            if not parsed_calls:
+                clean_text = _strip_tool_call_text(text)
+                if clean_text:
+                    await cl.Message(content=clean_text).send()
+                else:
+                    await cl.Message(content="No response generated.").send()
+                break
+
+            messages.append({"role": "assistant", "content": text})
+
+            for call in parsed_calls:
+                name = call.get("name", "unknown")
+                arguments = call.get("arguments", {})
+
+                tool_calls_seen.append({"name": name, "arguments": arguments})
 
                 try:
-                    args_display = json.dumps(json.loads(arguments), indent=2)
-                except (json.JSONDecodeError, TypeError):
+                    args_display = json.dumps(arguments, indent=2)
+                except (TypeError, ValueError):
                     args_display = str(arguments)
 
                 async with cl.Step(name=f"Tool: {name}") as step:
                     step.output = f"```json\n{args_display}\n```"
 
-            elif item_type == "function_call_output":
-                output = getattr(item, "output", "")
-                call_id = getattr(item, "call_id", "")
+                try:
+                    result = await _execute_tool(name, arguments)
+                except Exception as e:
+                    result = json.dumps({"error": str(e)})
+                    logger.error(f"Tool execution failed: {e}", exc_info=True)
 
                 try:
-                    parsed = json.loads(output) if isinstance(output, str) else output
+                    parsed = json.loads(result)
                     search_results_raw.append(parsed)
                 except (json.JSONDecodeError, TypeError):
-                    search_results_raw.append({"raw": output})
+                    search_results_raw.append({"raw": result})
 
-                preview = output[:300] + "..." if len(str(output)) > 300 else str(output)
-                async with cl.Step(name="Tool Result") as step:
+                preview = result[:500] + "..." if len(result) > 500 else result
+                async with cl.Step(name=f"Result: {name}") as step:
                     step.output = f"```\n{preview}\n```"
 
-            elif item_type == "message":
-                content = ""
-                for content_item in getattr(item, "content", []):
-                    if getattr(content_item, "type", None) == "output_text":
-                        content += getattr(content_item, "text", "")
-                if content:
-                    answer_text += content
+                messages.append({
+                    "role": "tool",
+                    "content": result,
+                    "tool_call_id": f"call_{name}_{iteration}",
+                })
 
-        if answer_text:
-            await cl.Message(content=answer_text).send()
-        elif hasattr(response, "output_text") and response.output_text:
-            answer_text = response.output_text
-            await cl.Message(content=answer_text).send()
+            logger.info(f"Iteration {iteration}: {len(parsed_calls)} tool calls executed")
         else:
-            await cl.Message(content="No response generated.").send()
+            await cl.Message(
+                content="Reached maximum iterations without a final answer."
+            ).send()
 
-        _enrich_trace_metadata(tool_calls_seen, search_results_raw, answer_text)
+        if MLFLOW_ENABLED:
+            _enrich_trace_metadata(tool_calls_seen, search_results_raw, text)
 
     except Exception as e:
-        logger.error(f"OGX request failed: {e}", exc_info=True)
+        logger.error(f"Agent loop failed: {e}", exc_info=True)
         await cl.Message(content=f"Error: {e}").send()
 
 
@@ -193,15 +296,7 @@ def _enrich_trace_metadata(
     search_results: list[dict],
     answer: str,
 ):
-    """Add provenance tags to the MLflow trace.
-
-    MUST match M4's tag schema exactly — the Registry provenance portal
-    (src/registry/provenance.py) parses these tags by name. Breaking this
-    contract breaks the portal for M5 queries.
-
-    Contract tags: doc_ids_cited, pipeline_run_ids, collection_queried,
-                   chunks_detail, answer_preview, chunks_retrieved_count
-    """
+    """Add provenance tags to the MLflow trace."""
     try:
         doc_ids = set()
         pipeline_run_ids = set()

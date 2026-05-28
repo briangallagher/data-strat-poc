@@ -16,17 +16,6 @@ spec:
       labels:
         app: mcp-knowledge-base
     spec:
-      initContainers:
-        - name: git-clone
-          image: alpine/git:latest
-          command:
-            - /bin/sh
-            - -c
-            - |
-              git clone --branch main --depth 1 https://github.com/briangallagher/data-strat-poc.git /app-src
-          volumeMounts:
-            - name: app-source
-              mountPath: /app-src
       containers:
         - name: mcp-server
           image: python:3.12-slim
@@ -35,8 +24,8 @@ spec:
             - -c
             - |
               set -ex
-              pip install fastmcp pymilvus sentence-transformers pydantic
-              cd /app-src/src/query_ogx
+              pip install --no-cache-dir fastmcp pymilvus sentence-transformers pydantic
+              cd /app
               exec python mcp_server.py
           ports:
             - containerPort: 8000
@@ -56,21 +45,22 @@ spec:
               memory: 1Gi
             limits:
               cpu: "1"
-              memory: 2Gi
+              memory: 4Gi
           readinessProbe:
-            httpGet:
-              path: /sse
+            tcpSocket:
               port: 8000
-            initialDelaySeconds: 60
+            initialDelaySeconds: 120
             periodSeconds: 10
           volumeMounts:
             - name: app-source
-              mountPath: /app-src
+              mountPath: /app
+              readOnly: true
             - name: model-cache
               mountPath: /root/.cache
       volumes:
         - name: app-source
-          emptyDir: {}
+          configMap:
+            name: mcp-server-source
         - name: model-cache
           emptyDir: {}
 ---

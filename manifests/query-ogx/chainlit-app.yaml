@@ -16,18 +16,6 @@ spec:
       labels:
         app: compliance-review-ui
     spec:
-      serviceAccountName: pipeline-runner
-      initContainers:
-        - name: git-clone
-          image: alpine/git:latest
-          command:
-            - /bin/sh
-            - -c
-            - |
-              git clone --branch main --depth 1 https://github.com/briangallagher/data-strat-poc.git /app-src
-          volumeMounts:
-            - name: app-source
-              mountPath: /app-src
       containers:
         - name: chainlit
           image: python:3.12-slim
@@ -36,22 +24,25 @@ spec:
             - -c
             - |
               set -ex
-              pip install openai chainlit mlflow mlflow-tracing httpx python-dotenv
-              cd /app-src/src/query_ogx
+              cp /src/*.py /app/
+              pip install --no-cache-dir openai chainlit mlflow mlflow-tracing httpx python-dotenv mcp
+              cd /app
               exec chainlit run app.py --host 0.0.0.0 --port 8080
           ports:
             - containerPort: 8080
           env:
             - name: OGX_BASE_URL
-              value: "http://llamastack.data-strat-poc.svc.cluster.local:8321/v1"
+              value: "http://ogx-compliance-service.data-strat-poc.svc.cluster.local:8321/v1"
             - name: OGX_API_KEY
               value: "fake"
             - name: OGX_MODEL
-              value: "granite-3.3-8b-instruct"
+              value: "vllm-granite/granite-llm"
             - name: MCP_SERVER_URL
               value: "http://mcp-knowledge-base.data-strat-poc.svc.cluster.local:8000/sse"
             - name: MLFLOW_TRACKING_URI
-              value: "https://mlflow.redhat-ods-applications.svc:8443"
+              value: "https://mlflow.redhat-ods-applications.svc.cluster.local:8443"
+            - name: MLFLOW_TRACKING_INSECURE_TLS
+              value: "true"
             - name: MLFLOW_EXPERIMENT_NAME
               value: "compliance-review-agent"
             - name: MARQUEZ_API_URL
@@ -69,13 +60,19 @@ spec:
             httpGet:
               path: /
               port: 8080
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 10
           volumeMounts:
-            - name: app-source
-              mountPath: /app-src
+            - name: src
+              mountPath: /src
+              readOnly: true
+            - name: app
+              mountPath: /app
       volumes:
-        - name: app-source
+        - name: src
+          configMap:
+            name: chainlit-source
+        - name: app
           emptyDir: {}
 ---
 apiVersion: v1
