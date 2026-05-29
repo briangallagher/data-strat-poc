@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   PageSection,
@@ -28,6 +28,17 @@ export function ImpactAnalysisPage() {
   const [provenance, setProvenance] = useState<DocumentProvenance | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [kfpBase, setKfpBase] = useState<{ dashboard: string; namespace: string } | null>(null);
+
+  useEffect(() => {
+    api.getExternalLinks()
+      .then((links) => {
+        if (links.kfp_dashboard && links.kfp_namespace) {
+          setKfpBase({ dashboard: links.kfp_dashboard, namespace: links.kfp_namespace });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleSearch() {
     if (!docId.trim()) return;
@@ -118,9 +129,21 @@ export function ImpactAnalysisPage() {
                   <DescriptionListDescription>
                     {provenance.pipeline_run_ids.length > 0 ? (
                       provenance.pipeline_run_ids.map((id) => (
-                        <Label key={id} color="grey" isCompact style={{ marginRight: 4 }}>
-                          {id.slice(0, 8)}...
-                        </Label>
+                        kfpBase ? (
+                          <a
+                            key={id}
+                            href={`${kfpBase.dashboard}/pipelineRuns/${kfpBase.namespace}/runs/${id}/details`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ marginRight: 4 }}
+                          >
+                            <Label color="blue" isCompact>{id.slice(0, 8)}...</Label>
+                          </a>
+                        ) : (
+                          <Label key={id} color="grey" isCompact style={{ marginRight: 4 }}>
+                            {id.slice(0, 8)}...
+                          </Label>
+                        )
                       ))
                     ) : (
                       <span style={{ color: '#666' }}>None</span>

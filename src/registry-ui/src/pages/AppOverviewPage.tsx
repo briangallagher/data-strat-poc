@@ -88,7 +88,7 @@ export function AppOverviewPage() {
                   <DescriptionListGroup>
                     <DescriptionListTerm>Queries</DescriptionListTerm>
                     <DescriptionListDescription>
-                      <Label color="gold" isCompact>{app.query_count}</Label>
+                      <Label color="orange" isCompact>{app.query_count}</Label>
                     </DescriptionListDescription>
                   </DescriptionListGroup>
                   <DescriptionListGroup>

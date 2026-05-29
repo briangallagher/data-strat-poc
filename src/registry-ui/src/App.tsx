@@ -31,7 +31,7 @@ import { api } from './api';
 
 function AppNav() {
   const location = useLocation();
-  const [links, setLinks] = useState<{ marquez_web?: string; mlflow?: string; marquez_lineage?: string }>({});
+  const [links, setLinks] = useState<{ marquez_web?: string; mlflow?: string; marquez_lineage?: string; kfp_dashboard?: string; kfp_namespace?: string }>({});
 
   useEffect(() => {
     api.getExternalLinks().then(setLinks).catch(() => {});
@@ -74,6 +74,11 @@ function AppNav() {
             {links.mlflow && (
               <NavItem>
                 <a href={links.mlflow} target="_blank" rel="noopener noreferrer">MLflow ↗</a>
+              </NavItem>
+            )}
+            {links.kfp_dashboard && links.kfp_namespace && (
+              <NavItem>
+                <a href={`${links.kfp_dashboard}/pipelineRuns/${links.kfp_namespace}`} target="_blank" rel="noopener noreferrer">KFP Pipelines ↗</a>
               </NavItem>
             )}
           </NavGroup>

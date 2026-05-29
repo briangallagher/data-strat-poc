@@ -26,6 +26,7 @@ export function DocumentProvenancePage() {
   const [prov, setProv] = useState<DocumentProvenance | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [kfpBase, setKfpBase] = useState<{ dashboard: string; namespace: string } | null>(null);
 
   useEffect(() => {
     if (!docId) return;
@@ -33,6 +34,13 @@ export function DocumentProvenancePage() {
       .then(setProv)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
+    api.getExternalLinks()
+      .then((links) => {
+        if (links.kfp_dashboard && links.kfp_namespace) {
+          setKfpBase({ dashboard: links.kfp_dashboard, namespace: links.kfp_namespace });
+        }
+      })
+      .catch(() => {});
   }, [docId]);
 
   if (loading) return <PageSection><Spinner /></PageSection>;
@@ -95,7 +103,19 @@ export function DocumentProvenancePage() {
                   {prov.pipeline_run_ids.map((pid) => (
                     <DescriptionListGroup key={pid}>
                       <DescriptionListTerm>pipeline_run_id</DescriptionListTerm>
-                      <DescriptionListDescription><code>{pid}</code></DescriptionListDescription>
+                      <DescriptionListDescription>
+                        {kfpBase ? (
+                          <a
+                            href={`${kfpBase.dashboard}/pipelineRuns/${kfpBase.namespace}/runs/${pid}/details`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <code>{pid}</code>
+                          </a>
+                        ) : (
+                          <code>{pid}</code>
+                        )}
+                      </DescriptionListDescription>
                     </DescriptionListGroup>
                   ))}
                 </DescriptionList>

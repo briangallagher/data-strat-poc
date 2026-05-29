@@ -196,7 +196,7 @@ export const api = {
     return fetchJSON(`${BASE}/provenance/apps`);
   },
 
-  getExternalLinks(): Promise<{ marquez_web: string; marquez_api: string; mlflow: string; marquez_lineage: string }> {
+  getExternalLinks(): Promise<{ marquez_web: string; marquez_api: string; mlflow: string; marquez_lineage: string; kfp_dashboard?: string; kfp_namespace?: string }> {
     return fetchJSON(`${BASE}/provenance/links`);
   },
 

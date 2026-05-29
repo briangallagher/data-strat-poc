@@ -103,7 +103,7 @@ export function CollectionHealthPage() {
                       <DescriptionListDescription>
                         {health?.consuming_apps?.length ? (
                           health.consuming_apps.map((app) => (
-                            <Label key={app} color="cyan" isCompact style={{ marginRight: 4 }}>
+                            <Label key={app} color="teal" isCompact style={{ marginRight: 4 }}>
                               {app}
                             </Label>
                           ))
@@ -115,7 +115,7 @@ export function CollectionHealthPage() {
                     <DescriptionListGroup>
                       <DescriptionListTerm>Queries</DescriptionListTerm>
                       <DescriptionListDescription>
-                        <Label color="gold" isCompact>{health?.query_count ?? 0}</Label>
+                        <Label color="orange" isCompact>{health?.query_count ?? 0}</Label>
                       </DescriptionListDescription>
                     </DescriptionListGroup>
                     <DescriptionListGroup>

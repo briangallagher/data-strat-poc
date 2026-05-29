@@ -30,6 +30,11 @@ MARQUEZ_WEB_URL = os.environ.get(
     "MARQUEZ_WEB_URL",
     "https://marquez-web-data-strat-poc.apps.dev.aip-ft.rh-ods.com",
 )
+KFP_DASHBOARD_URL = os.environ.get(
+    "KFP_DASHBOARD_URL",
+    "https://rhods-dashboard-redhat-ods-applications.apps.dev.aip-ft.rh-ods.com",
+)
+KFP_NAMESPACE = os.environ.get("KFP_NAMESPACE", "data-strat-poc")
 
 SA_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
@@ -409,6 +414,8 @@ async def get_external_links():
         "marquez_api": MARQUEZ_API_URL,
         "mlflow": MLFLOW_EXTERNAL_URL,
         "marquez_lineage": MARQUEZ_WEB_URL,
+        "kfp_dashboard": KFP_DASHBOARD_URL,
+        "kfp_namespace": KFP_NAMESPACE,
     }
 
 
