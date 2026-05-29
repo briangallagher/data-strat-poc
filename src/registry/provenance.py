@@ -605,31 +605,33 @@ def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[Tra
         inputs_raw = metadata_dict.get("mlflow.traceInputs", "{}")
         try:
             inputs = _json.loads(inputs_raw)
-            msgs = inputs.get("messages", [])
-            for msg in reversed(msgs):
-                role = msg.get("role", "")
-                msg_type = msg.get("type", "")
-                if role == "user" or msg_type == "human":
-                    question = msg.get("content", "")[:200]
-                    break
+            if "question" in inputs and isinstance(inputs["question"], str):
+                question = inputs["question"][:200]
+            else:
+                msgs = inputs.get("messages", [])
+                for msg in reversed(msgs):
+                    role = msg.get("role", "")
+                    msg_type = msg.get("type", "")
+                    if role == "user" or msg_type == "human":
+                        question = msg.get("content", "")[:200]
+                        break
         except (_json.JSONDecodeError, TypeError, IndexError):
             m = _re.search(r'"content":\s*"([^"]{10,})', inputs_raw)
             if m:
                 question = m.group(1)[:200]
 
-        # --- Answer: handle both chat completion and message-list formats ---
-        # MLflow truncates traceOutputs to 250 chars, so also try regex fallback
+        # --- Answer: handle span outputs, chat completion, and message-list formats ---
         outputs_raw = metadata_dict.get("mlflow.traceOutputs", "{}")
         try:
             outputs = _json.loads(outputs_raw)
-            # OpenAI chat completion format: choices[].message.content
-            if "choices" in outputs:
+            if "answer" in outputs and isinstance(outputs["answer"], str):
+                answer_preview = outputs["answer"][:500]
+            elif "choices" in outputs:
                 for choice in outputs["choices"]:
                     content = choice.get("message", {}).get("content", "")
                     if content:
                         answer_preview = content[:500]
                         break
-            # LangChain/agent format: messages[].content where type=ai
             elif "messages" in outputs:
                 for msg in reversed(outputs.get("messages", [])):
                     msg_type = msg.get("type", "")
@@ -638,7 +640,6 @@ def _extract_trace_summary(trace: dict, doc_id_filter: str = "") -> Optional[Tra
                         answer_preview = content[:500]
                         break
         except (_json.JSONDecodeError, TypeError, IndexError):
-            # Truncated JSON — extract content after "content": "
             m = _re.search(r'"content":\s*"(.+)', outputs_raw)
             if m:
                 raw_answer = m.group(1)
