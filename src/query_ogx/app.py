@@ -261,83 +261,89 @@ async def on_message(message: cl.Message):
     search_results_raw = []
 
     try:
-        for iteration in range(MAX_INFER_ITERS):
-            tc_mode = "required" if iteration == 0 else "auto"
-            response = client.chat.completions.create(
-                model=OGX_MODEL,
-                messages=messages,
-                tools=MCP_TOOLS,
-                tool_choice=tc_mode,
-                temperature=0,
-                max_tokens=4096,
-            )
+        with mlflow.start_span(name="compliance_review_agent") as span:
+            span.set_inputs({"question": message.content})
+            text = ""
 
-            choice = response.choices[0]
-            text = choice.message.content or ""
+            for iteration in range(MAX_INFER_ITERS):
+                tc_mode = "required" if iteration == 0 else "auto"
+                response = client.chat.completions.create(
+                    model=OGX_MODEL,
+                    messages=messages,
+                    tools=MCP_TOOLS,
+                    tool_choice=tc_mode,
+                    temperature=0,
+                    max_tokens=4096,
+                )
 
-            structured_calls = choice.message.tool_calls or []
-            if structured_calls:
-                parsed_calls = [
-                    {"name": tc.function.name, "arguments": json.loads(tc.function.arguments)}
-                    for tc in structured_calls
-                ]
-            else:
-                parsed_calls = _parse_tool_calls(text)
+                choice = response.choices[0]
+                text = choice.message.content or ""
 
-            if not parsed_calls:
-                clean_text = _strip_tool_call_text(text)
-                if clean_text:
-                    await cl.Message(content=clean_text).send()
+                structured_calls = choice.message.tool_calls or []
+                if structured_calls:
+                    parsed_calls = [
+                        {"name": tc.function.name, "arguments": json.loads(tc.function.arguments)}
+                        for tc in structured_calls
+                    ]
                 else:
-                    await cl.Message(content="No response generated.").send()
-                break
+                    parsed_calls = _parse_tool_calls(text)
 
-            messages.append({"role": "assistant", "content": text})
+                if not parsed_calls:
+                    clean_text = _strip_tool_call_text(text)
+                    if clean_text:
+                        await cl.Message(content=clean_text).send()
+                    else:
+                        await cl.Message(content="No response generated.").send()
+                    break
 
-            for call in parsed_calls:
-                name = call.get("name", "unknown")
-                arguments = call.get("arguments", {})
+                messages.append({"role": "assistant", "content": text})
 
-                tool_calls_seen.append({"name": name, "arguments": arguments})
+                for call in parsed_calls:
+                    name = call.get("name", "unknown")
+                    arguments = call.get("arguments", {})
 
-                try:
-                    args_display = json.dumps(arguments, indent=2)
-                except (TypeError, ValueError):
-                    args_display = str(arguments)
+                    tool_calls_seen.append({"name": name, "arguments": arguments})
 
-                async with cl.Step(name=f"Tool: {name}") as step:
-                    step.output = f"```json\n{args_display}\n```"
+                    try:
+                        args_display = json.dumps(arguments, indent=2)
+                    except (TypeError, ValueError):
+                        args_display = str(arguments)
 
-                try:
-                    result = await _execute_tool(name, arguments)
-                except Exception as e:
-                    result = json.dumps({"error": str(e)})
-                    logger.error(f"Tool execution failed: {e}", exc_info=True)
+                    async with cl.Step(name=f"Tool: {name}") as step:
+                        step.output = f"```json\n{args_display}\n```"
 
-                try:
-                    parsed = json.loads(result)
-                    search_results_raw.append(parsed)
-                except (json.JSONDecodeError, TypeError):
-                    search_results_raw.append({"raw": result})
+                    try:
+                        result = await _execute_tool(name, arguments)
+                    except Exception as e:
+                        result = json.dumps({"error": str(e)})
+                        logger.error(f"Tool execution failed: {e}", exc_info=True)
 
-                preview = result[:500] + "..." if len(result) > 500 else result
-                async with cl.Step(name=f"Result: {name}") as step:
-                    step.output = f"```\n{preview}\n```"
+                    try:
+                        parsed = json.loads(result)
+                        search_results_raw.append(parsed)
+                    except (json.JSONDecodeError, TypeError):
+                        search_results_raw.append({"raw": result})
 
-                messages.append({
-                    "role": "tool",
-                    "content": result,
-                    "tool_call_id": f"call_{name}_{iteration}",
-                })
+                    preview = result[:500] + "..." if len(result) > 500 else result
+                    async with cl.Step(name=f"Result: {name}") as step:
+                        step.output = f"```\n{preview}\n```"
 
-            logger.info(f"Iteration {iteration}: {len(parsed_calls)} tool calls executed")
-        else:
-            await cl.Message(
-                content="Reached maximum iterations without a final answer."
-            ).send()
+                    messages.append({
+                        "role": "tool",
+                        "content": result,
+                        "tool_call_id": f"call_{name}_{iteration}",
+                    })
 
-        if MLFLOW_ENABLED:
-            _enrich_trace_metadata(tool_calls_seen, search_results_raw, text)
+                logger.info(f"Iteration {iteration}: {len(parsed_calls)} tool calls executed")
+            else:
+                await cl.Message(
+                    content="Reached maximum iterations without a final answer."
+                ).send()
+
+            span.set_outputs({"answer": text[:1000]})
+
+            if MLFLOW_ENABLED:
+                _enrich_trace_metadata(tool_calls_seen, search_results_raw, text)
 
     except Exception as e:
         logger.error(f"Agent loop failed: {e}", exc_info=True)

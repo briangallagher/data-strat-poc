@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from typing import Optional
+from urllib.parse import quote as _url_quote
 
 import httpx
 from fastapi import APIRouter, HTTPException
@@ -159,8 +160,9 @@ async def _get_marquez_runs_for_job(job_name: str, namespace: str = MARQUEZ_NAME
     """Fetch runs for a specific Marquez job."""
     client = _get_client()
     try:
+        encoded_name = _url_quote(job_name, safe="")
         resp = await client.get(
-            f"{MARQUEZ_API_URL}/api/v1/namespaces/{namespace}/jobs/{job_name}/runs",
+            f"{MARQUEZ_API_URL}/api/v1/namespaces/{namespace}/jobs/{encoded_name}/runs",
             params={"limit": 10},
         )
         resp.raise_for_status()
@@ -277,7 +279,7 @@ async def get_document_provenance(doc_id: str):
                     job_name=job_name,
                     run_id=run.get("id", ""),
                     namespace=MARQUEZ_NAMESPACE,
-                    url=f"{MARQUEZ_WEB_URL}/lineage/job/{MARQUEZ_NAMESPACE}/{job_name}",
+                    url=f"{MARQUEZ_WEB_URL}/lineage/job/{MARQUEZ_NAMESPACE}/{_url_quote(job_name, safe='')}",
                 ))
 
         traces = await _search_mlflow_traces()
@@ -377,7 +379,7 @@ async def get_collection_provenance(collection_name: str):
                         job_name=job["name"],
                         run_id="",
                         namespace=job.get("namespace", MARQUEZ_NAMESPACE),
-                        url=f"{MARQUEZ_WEB_URL}/lineage/job/{MARQUEZ_NAMESPACE}/{job['name']}",
+                        url=f"{MARQUEZ_WEB_URL}/lineage/job/{MARQUEZ_NAMESPACE}/{_url_quote(job['name'], safe='')}",
                     ))
 
         traces = await _search_mlflow_traces()
@@ -491,7 +493,7 @@ async def get_collection_health(collection_name: str):
                         job_name=app_name,
                         run_id="",
                         namespace=job.get("namespace", MARQUEZ_NAMESPACE),
-                        url=f"{MARQUEZ_WEB_URL}/lineage/job/{MARQUEZ_NAMESPACE}/{app_name}",
+                        url=f"{MARQUEZ_WEB_URL}/lineage/job/{MARQUEZ_NAMESPACE}/{_url_quote(app_name, safe='')}",
                     ))
 
         traces = await _search_mlflow_traces()
