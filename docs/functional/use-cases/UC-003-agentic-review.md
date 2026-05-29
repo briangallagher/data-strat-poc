@@ -10,7 +10,7 @@
 
 - Multiple document collections ingested (underwriting guidelines, ISO forms, regulatory bulletins)
 - OGX agent capabilities available (agentic RAG, multi-step tool calling)
-- Granite LLM with sufficient reasoning capability (70B or equivalent)
+- LLM with native tool calling support (Hermes-3-Llama-3.1-70B-FP8 in POC)
 
 ## Main Success Scenario
 
@@ -24,7 +24,8 @@
 
 ## Extensions (Alternate Flows)
 
-<!-- TODO: Define when M5 planning begins -->
+- **3a.** If agent encounters context length limits, reduce `top_k` per collection and re-execute searches
+- **5a.** If partial collections fail, agent flags incomplete coverage in the report rather than silently omitting
 
 ## Postconditions
 
@@ -45,4 +46,4 @@
 - **Requirements:** FR-011
 - **Persona:** Compliance Officer
 
-<!-- TODO: Lightweight stub — flesh out when M5 planning begins -->
+**Implementation:** M5 — verified E2E with 4 tool calls across 3 collections using Hermes 70B FP8 via vLLM.

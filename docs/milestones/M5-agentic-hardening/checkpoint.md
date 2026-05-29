@@ -1,7 +1,7 @@
 # M5 Checkpoint: Agentic + Hardening
 
 **Date:** 2026-05-28
-**Status:** In Progress (code complete, pending cluster deployment and E2E verification)
+**Status:** Complete
 
 ## Objective
 
@@ -70,7 +70,7 @@ Client (Chainlit) → OGX Responses API → MCP Server (SSE) → Milvus (3 colle
 | Chainlit app deployment | `manifests/query-ogx/chainlit-app.yaml` |
 | Production gaps update | `docs/production-gaps.md` — 7 new gaps (PG-054–PG-060), 1 closed (PG-037) |
 
-### Phase 5: Verification + Documentation (IN PROGRESS)
+### Phase 5: Verification + Documentation (COMPLETE)
 
 | Deliverable | Status |
 |-------------|--------|
@@ -78,31 +78,50 @@ Client (Chainlit) → OGX Responses API → MCP Server (SSE) → Milvus (3 colle
 | DEC-012: OGX Trace Correlation | **Complete** — `docs/decisions.md` |
 | Observability comparison | **Complete** — `docs/technical/observability-comparison.md` |
 | Production gaps recheck | **Complete** — 60 gaps tracked, 12 closed/mitigated, 48 open |
-| E2E Workflow B test | **Pending** — requires cluster deployment |
-| M1-M4 regression | **Pending** — requires cluster deployment |
-| Repo tagging (`m5-complete`) | **Pending** — after E2E verification |
+| E2E Workflow B test | **Complete** — Hermes-3-Llama-3.1-70B-FP8 via vLLM, 4 tool calls across 3 collections, synthesized compliance review |
+| M1-M4 regression | **Complete** — all components operational |
+| Repo tagging (`m5-complete`) | **Complete** |
 
-## What's Left for Cluster Verification
+### Phase 6: Model Upgrade + Registry Hardening (COMPLETE)
 
-1. Deploy OGX Operator in `data-strat-poc` namespace
-2. Deploy MCP server pod (SSE transport)
-3. Deploy Chainlit app pod for compliance review
-4. Verify Granite LLM compatibility with OGX
-5. Run canonical Workflow B query: "Review our GL guidelines against ISO CG 00 01. Flag deviations."
-6. Verify MLflow trace captures tool calls and provenance tags
-7. Verify Registry UI views render with real data
-8. M1-M4 regression pass
-9. Tag repos `m5-complete`
+| Deliverable | Detail |
+|-------------|--------|
+| Model upgrade | Granite 3.3 8B → Hermes-3-Llama-3.1-70B-FP8 (NousResearch, ungated, FP8 quantized, fits 1x A100-80GB) |
+| Granite 3.3 8B retired | Confirmed unsupported for vLLM tool calling; Hermes provides native structured `tool_calls` with `tool_choice=auto` |
+| Deployment mode | Raw Kubernetes Deployment (bypassing KServe storage initializer limitations) |
+| Registry trace extraction | Fixed to handle both OpenAI chat completion format (agentic) and LangChain format (deterministic) |
+| Multi-experiment search | Registry now searches across multiple MLflow experiments (`compliance-review-agent` + `underwriter-chat-v3`) |
+| Apps discovery | From MLflow trace tags (not just Marquez APPLICATION jobs) |
+| Observability links | Marquez and MLflow external links added to registry UI sidebar |
+| Marquez lineage | `compliance_review_agent` registered as APPLICATION consuming all 3 Milvus collections with correct dataset namespace |
+| Full E2E lineage graph | source docs → acquire → parse_and_chunk → ingest_to_milvus → Milvus collections → application |
+| MLflow traces | 4 clean traces: 3 deterministic (one per collection) + 1 agentic (multi-collection) |
+| PG-060 closed | MLflow auth resolved |
+| Cluster cleanup | Stale Granite ISVC, completed docling Jobs, stuck PVCs removed |
+
+## Cluster Verification (COMPLETE)
+
+All items verified on cluster:
+
+- [x] Deploy OGX Operator in `data-strat-poc` namespace
+- [x] Deploy MCP server pod (SSE transport)
+- [x] Deploy Chainlit app pod for compliance review
+- [x] Model serving via vLLM (Hermes-3-Llama-3.1-70B-FP8, raw Deployment)
+- [x] Run canonical Workflow B query — 4 tool calls across 3 collections, synthesized compliance review
+- [x] MLflow trace captures tool calls and provenance tags (4 clean traces)
+- [x] Registry UI views render with real data
+- [x] M1-M4 regression pass
+- [x] Tag repos `m5-complete`
 
 ## Production Gap Summary (M5)
 
 | Metric | Count |
 |--------|-------|
 | Total gaps | 60 |
-| Closed/Mitigated | 12 |
-| Open | 48 |
+| Closed/Mitigated | 13 |
+| Open | 47 |
 | New in M5 | 7 (PG-054–PG-060) |
-| Closed in M5 | 1 (PG-037) |
+| Closed in M5 | 2 (PG-037, PG-060) |
 
 ## New Files in M5
 
@@ -114,15 +133,22 @@ src/query_ogx/
 ├── requirements.txt       # Dependencies
 └── .env.example           # Configuration
 
-src/registry-ui/src/pages/
-├── CollectionHealthPage.tsx    # M5 UI view
-├── AppOverviewPage.tsx         # M5 UI view
-├── ImpactAnalysisPage.tsx      # M5 UI view
-└── RegisterDocumentsPage.tsx   # M5 UI view
+src/registry/
+└── provenance.py              # Updated: multi-experiment search, dual trace extraction
+
+src/registry-ui/src/
+├── App.tsx                    # Updated: observability links in sidebar
+├── api.ts                     # Updated: links endpoint
+└── pages/
+    ├── CollectionHealthPage.tsx    # M5 UI view
+    ├── AppOverviewPage.tsx         # M5 UI view
+    ├── ImpactAnalysisPage.tsx      # M5 UI view
+    └── RegisterDocumentsPage.tsx   # M5 UI view
 
 manifests/query-ogx/
-├── mcp-server.yaml        # MCP server deployment
-└── chainlit-app.yaml      # Chainlit app deployment
+├── mcp-server.yaml            # MCP server deployment
+├── chainlit-app.yaml          # Chainlit app deployment
+└── hermes-70b-fp8-vllm.yaml  # Hermes model vLLM deployment
 
 docs/
 ├── architecture/adrs/ADR-004-ogx-agentic-rag.md
@@ -141,3 +167,4 @@ docs/
 | Tool protocol: MCP via SSE (not REST) | Phase 0 findings in `plan.md` |
 | Inline MCP tool definition in Responses API (POC simplicity) | Phase 1 implementation |
 | Shared trace tag contract between M4 and M5 | Phase 2 implementation |
+| Model selection: Hermes-3-Llama-3.1-70B-FP8 for tool calling quality | Phase 6 findings |

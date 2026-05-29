@@ -212,7 +212,7 @@ Users never need to open Marquez, MLflow, or a terminal. Deep links to those sys
 ### DEC-012: OGX Trace Correlation Strategy
 **Date:** 2026-05-28
 **Milestone:** M5
-**Status:** Proposed (pending hands-on verification of Q2)
+**Status:** Accepted (verified — autolog captures tool call rounds as child spans)
 
 **Context:** M5 builds the agentic compliance review agent on OGX Responses API with server-side Tool Runtime. OGX owns the agent loop: the client sends one request and gets a final response. Tools (MCP servers) are called by OGX during the loop, not by our code. This creates a trace correlation problem — how do we build a single MLflow trace that captures the client request, OGX's tool calls, and the tool results?
 
@@ -238,3 +238,30 @@ Since Q1=Yes (response includes full tool call details), the client can reconstr
 This is analogous to how M4's `mlflow.langchain.autolog()` captures LangGraph tool calls without the MCP server needing its own MLflow instrumentation.
 
 **Consequences:** Simpler architecture — tool service stays clean (no MLflow dependency). All tracing happens client-side. Trade-off: if OGX encounters errors during tool calls that aren't reflected in the response, the client won't see them. Acceptable for POC; revisit if tool reliability is an issue.
+
+### DEC-013: Model Selection — Hermes-3-Llama-3.1-70B-FP8
+**Date:** 2026-05-28
+**Milestone:** M5
+**Status:** Accepted
+
+**Context:** M4/M5 require an LLM that produces structured `tool_calls` responses (JSON function calls) when given tool definitions and `tool_choice=auto`. The initial model — IBM Granite 3.3 8B Instruct — was tested but generated conversational text describing tool use ("I will search the database for...") rather than actual function call JSON. This is a fundamental blocker for both deterministic and agentic RAG workflows.
+
+Options evaluated:
+
+| Model | Size | Tool Calling | Access | Storage | GPU |
+|-------|------|-------------|--------|---------|-----|
+| Granite 3.3 8B Instruct | 16GB | Broken in vLLM | Open | Fits emptyDir | 1x A100 |
+| Llama 3.1 70B Instruct | 140GB | Native (llama3_json parser) | Gated (HF token) | Too large for emptyDir or PVC on IBM VPC | 2x A100 |
+| Hermes-3-Llama-3.1-70B-FP8 | ~70GB | Native (hermes parser) | Ungated | Fits emptyDir (80Gi) | 1x A100-80GB |
+| Llama 3.1 70B AWQ | ~35GB | Native | Gated | Fits emptyDir | 1x A100 |
+
+**Decision:** Use `NousResearch/Hermes-3-Llama-3.1-70B-FP8` for the POC.
+
+Rationale:
+1. **Ungated** — no HuggingFace token required, simplifying deployment
+2. **FP8 quantized** — fits in ~70GB ephemeral storage on a single A100-80GB GPU
+3. **Native tool calling** — vLLM's `--tool-call-parser=hermes` produces correct structured function calls
+4. **Quality** — 70B parameter model provides high-quality synthesis and multi-hop reasoning
+5. **Raw Deployment** — deployed as a Kubernetes Deployment (not KServe InferenceService) to bypass KServe storage initializer limitations with large models
+
+**Consequences:** The system now depends on A100-80GB GPU availability. Model download takes 5-10 minutes on first pod start. The raw Deployment approach means no KServe autoscaling or canary features — acceptable for POC. Granite 8B remains an option for low-resource environments if tool calling support improves.

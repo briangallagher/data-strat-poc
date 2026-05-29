@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# MLflow local artifacts
+mlflow.db
+mlruns.db
+mlruns/
+
+# Chainlit local state
+.chainlit/
+chainlit.md
+
+# Test artifacts
+test.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store

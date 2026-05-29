@@ -9,7 +9,8 @@ The lineage subsystem provides end-to-end data provenance for the ingest pipelin
 Lineage operates at two layers (only Layer 1 is implemented in M2):
 
 1. **Pipeline-time lineage (M2):** Tracks data flow through KFP components — what datasets were consumed, what was produced, by which job, in which run. Stored in Marquez.
-2. **Query-time lineage (M4, planned):** Tracks inference requests — which vectors were retrieved, which model generated the response, what prompt was used. Will use MLflow GenAI spans.
+2. **Query-time tracing (M4/M5):** Tracks inference requests — which vectors were retrieved, which model generated the response, what prompt was used. Implemented via MLflow GenAI autolog (`mlflow.langchain.autolog()` for deterministic RAG, `mlflow.openai.autolog()` for agentic RAG). Traces include provenance tags (`doc_ids_cited`, `pipeline_run_ids`, `collection_queried`) that bridge back to Marquez lineage.
+3. **Application lineage (M5):** Applications (`underwriter_chat`, `compliance_review_agent`) are registered in Marquez as consumers of Milvus collections via OpenLineage events, connecting the full graph from source docs to applications.
 
 ```mermaid
 graph LR
@@ -195,7 +196,7 @@ This ConfigMap is referenced in the DSPA CR via `configMapAsEnv`, making all val
 
 ## Future Considerations
 
-- **Query-time lineage (M4):** MLflow GenAI spans will trace inference requests. The Marquez bridge may be re-evaluated to combine pipeline and query lineage in one graph.
+- **Query-time lineage:** Implemented in M4/M5 via MLflow autolog. Pipeline and query lineage are federated through the Document Registry provenance portal rather than the Marquez bridge.
 - **Auto-instrumentation:** A KFP decorator or DSP webhook could auto-emit START/COMPLETE events, removing the need for explicit library calls in components.
 - **Schema facets:** Future components should emit `SchemaDatasetFacet` with field-level metadata (column names, types) for richer lineage.
 - **Column-level lineage:** Track which specific fields flow between datasets (e.g., `text` field in JSONL → `embedding` field in Milvus).

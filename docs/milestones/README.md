@@ -11,7 +11,7 @@ Execution plan for the Data Strategy POC v2. Each milestone builds incrementally
 | [M2: MLflow + Lineage](M2-mlflow/) | **Complete** | rhoai-lineage library, Marquez, MLflow, OL emission, E2E lineage graph | May 25 |
 | [M3: Connectors](M3-connectors/) | **Complete** | Document Registry + acquire_documents + 3-collection ingest (DEC-008) | May 26 |
 | [M4: Query](M4-query/) | **Complete** | LangGraph + MCP + MLflow autolog + Chainlit for deterministic RAG (Workflow A); queries `underwriting_guidelines`; full answer provenance via Chain 1; Marquez graph completion; unified provenance portal | May 27 |
-| [M5: Agentic + Hardening](M5-agentic-hardening/) | **Active** | OGX Responses API + server-side Tool Runtime for agentic RAG (Workflow B), multi-hop across all 3 collections, MLflow tracing, Registry UI views (Collection Health, App Overview, Impact Analysis, Register Documents), gap closure | May 28+ |
+| [M5: Agentic + Hardening](M5-agentic-hardening/) | **Complete** | OGX Responses API + MCP for agentic RAG (Workflow B); Hermes-3-Llama-3.1-70B-FP8 model with native tool calling; multi-collection compliance review; Registry UI views (Collection Health, App Overview, Impact Analysis, Register Documents); full Marquez lineage end-to-end; MLflow traces for both workflows; observability links in registry sidebar | May 28 |
 
 ## M1 Progress Detail
 
@@ -36,10 +36,24 @@ M2 adds pipeline observability and data lineage via `rhoai-lineage` library, Mar
 | Phase 3: Add OL emission | **Complete** | parse_and_chunk and ingest_to_milvus emit START/COMPLETE events. Pipeline run SUCCEEDED. | Full lineage graph verified: PVC → parse → S3 → ingest → Milvus. Custom facets present. |
 | Phase 4: E2E verification + docs | **Complete** | ADR-004, technical deep dives, user journey, production gaps documented. All repos tagged. | MLflow tracking not working (PG-024). pipeline_run_id not in Marquez facets (PG-025). 5 new PGs added. |
 
+## M5 Progress Detail
+
+M5 delivers agentic RAG (Workflow B) via OGX Responses API + MCP, upgrades the model to Hermes 70B FP8 for native tool calling, and hardens the Registry UI and lineage stack.
+
+| Phase | Status | What Was Done | Key Findings |
+|-------|--------|---------------|--------------|
+| Phase 0: OGX Research | **Complete** | MCP via SSE discovery, evaluated OGX Responses API integration patterns. | Client-side trace reconstruction required for OGX (DEC-012). |
+| Phase 1: Agentic Query Service | **Complete** | MCP server + Chainlit app + OpenLineage emission for Workflow B. | `src/query_ogx/` service wired end-to-end with tool-calling flow. |
+| Phase 2: Tracing + Observability | **Complete** | MLflow autolog, tag contract, observability comparison doc. | MLflow traces captured for both Workflow A and Workflow B. |
+| Phase 3: Registry UI Views | **Complete** | 4 new views: Collection Health, App Overview, Impact Analysis, Register Documents. | Full provenance portal with observability links in registry sidebar. |
+| Phase 4: Deployment | **Complete** | All components deployed on cluster. | Compliance Review UI and Document Registry live on cluster routes. |
+| Phase 5: Verification | **Complete** | E2E verified across both workflows. | Multi-collection compliance review confirmed working. |
+| Phase 6: Model Upgrade + Registry Hardening | **Complete** | Hermes-3-Llama-3.1-70B-FP8 deployed; registry multi-experiment trace extraction; Marquez lineage connected end-to-end. | Hermes 70B FP8 provides native tool calling without prompt hacking. Full lineage graph verified. |
+
 ## Principles
 
 - **Verify Before You Advance** — no milestone signs off without E2E verification at two scales
-- **Production-Grade from Day One** — deviations tracked in [production-gaps.md](../production-gaps.md) (53 gaps, 10 closed/mitigated)
+- **Production-Grade from Day One** — deviations tracked in [production-gaps.md](../production-gaps.md) (60 gaps, 14 closed/mitigated)
 - **Document as You Go** — each milestone produces ADRs, technical deep dives, and runbooks alongside the code
 - **Pause/Resume Friendly** — each checkpoint has enough context for a cold start
 
@@ -64,6 +78,7 @@ The plan is written before building starts. The checkpoint is written after veri
 | [DEC-009](../decisions.md) | Two-layer lineage: Marquez for ingest, MLflow traces for query | M4 |
 | [DEC-010](../decisions.md) | LangGraph + MCP + MLflow autolog for M4; OGX reserved for M5 agentic RAG | M4 |
 | [DEC-011](../decisions.md) | Registry UI as unified provenance portal | M4 |
+| [DEC-012](../decisions.md) | Client-side trace reconstruction for OGX; Hermes 70B FP8 for production tool calling | M5 |
 
 ## Where Things Live
 
@@ -83,6 +98,10 @@ The plan is written before building starts. The checkpoint is written after veri
 | Registry UI (with provenance portal) | `src/registry-ui/` |
 | Model serving manifests | `manifests/model-serving/` |
 | Assessment docs (Scenario B, feedback, ET questions) | `docs/assessment/` |
+| Agentic query service (MCP + OGX + Chainlit) | `src/query_ogx/` |
+| Hermes 70B FP8 vLLM manifest | `manifests/query-ogx/hermes-70b-fp8-vllm.yaml` |
+| Compliance Review UI | https://compliance-review-ui-data-strat-poc.apps.dev.aip-ft.rh-ods.com |
+| Document Registry | https://doc-registry-data-strat-poc.apps.dev.aip-ft.rh-ods.com |
 | Marquez Web UI | https://marquez-web-data-strat-poc.apps.dev.aip-ft.rh-ods.com |
 | Marquez API | https://marquez-data-strat-poc.apps.dev.aip-ft.rh-ods.com |
 | MLflow UI | https://mlflow-ui-redhat-ods-applications.apps.dev.aip-ft.rh-ods.com |

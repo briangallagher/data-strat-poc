@@ -32,7 +32,7 @@ MARQUEZ_WEB_URL = os.environ.get(
 )
 KFP_DASHBOARD_URL = os.environ.get(
     "KFP_DASHBOARD_URL",
-    "https://rhods-dashboard-redhat-ods-applications.apps.dev.aip-ft.rh-ods.com",
+    "https://rh-ai.apps.dev.aip-ft.rh-ods.com",
 )
 KFP_NAMESPACE = os.environ.get("KFP_NAMESPACE", "data-strat-poc")
 

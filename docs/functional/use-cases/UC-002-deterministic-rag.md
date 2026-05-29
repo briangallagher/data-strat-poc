@@ -9,17 +9,17 @@
 ## Preconditions
 
 - Document corpus ingested into Milvus (UC-001 complete)
-- OGX Responses API deployed and configured with Milvus retrieval tools
-- Granite LLM deployed and serving
-- Demo UI (Gradio) or equivalent query interface available
+- LangGraph agent with MCP tool access to Milvus
+- LLM deployed and serving (Hermes-3-Llama-3.1-70B-FP8 in POC)
+- Chainlit query interface available
 
 ## Main Success Scenario
 
 1. Underwriter enters a natural language question in the query interface
-2. OGX Responses API receives the query
-3. Query is embedded using the same embedding model used during ingest
+2. LangGraph agent receives the query via Chainlit
+3. Agent invokes MCP `milvus_search` tool — query is embedded and searched against the target collection
 4. Milvus similarity search retrieves the top-K relevant chunks
-5. Retrieved chunks (with metadata and citations) are passed to the Granite LLM
+5. Retrieved chunks (with metadata and citations) are passed to the LLM
 6. LLM generates a cited answer, referencing specific source documents and sections
 7. Answer is returned to the underwriter with inline citations
 8. Query-time trace is recorded in MLflow (query text, retrieved chunks, cited sources, `pipeline_run_id` bridge)
@@ -49,4 +49,4 @@
 - **Requirements:** FR-009, FR-010
 - **Persona:** Underwriter
 
-<!-- TODO: Flesh out extensions and non-functional requirements when M4 planning begins -->
+**Implementation:** M4 — verified E2E with LangGraph + MCP + `mlflow.langchain.autolog()`. MLflow experiment: `underwriter-chat-v3`.

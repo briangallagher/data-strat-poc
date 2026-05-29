@@ -106,7 +106,7 @@ export function DocumentProvenancePage() {
                       <DescriptionListDescription>
                         {kfpBase ? (
                           <a
-                            href={`${kfpBase.dashboard}/pipelineRuns/${kfpBase.namespace}/runs/${pid}/details`}
+                            href={`${kfpBase.dashboard}/develop-train/pipelines/runs/${kfpBase.namespace}/runs/${pid}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >

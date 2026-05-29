@@ -3,7 +3,7 @@
 Every deviation from enterprise/production standard is tracked here. Nothing is silently accepted.
 
 **Updated at:** every milestone checkpoint.
-**Last Updated:** 2026-05-28 (M5 in progress — 60 gaps tracked; M5 added PG-054–PG-060, closed PG-037)
+**Last Updated:** 2026-05-28 (M5 complete — 60 gaps tracked; M5 added PG-054–PG-060, closed PG-037 + PG-060)
 
 ## How to Use
 
@@ -149,7 +149,7 @@ Issues with OGX (Llama Stack) deployment, agentic query orchestration, and MCP t
 | PG-057 | OGX agent may skip tool calls (like PG-047) | LLMs may answer from parametric knowledge without searching, bypassing retrieval | Mandatory retrieval before generation | Monitor via MLflow traces; system prompt hardening; evaluate `tool_choice: "required"` | Open |
 | PG-058 | No streaming support in M5 Chainlit app | M5 app uses non-streaming Responses API call | Streaming responses for better UX | Add `stream=True` to `client.responses.create()` and stream chunks to Chainlit | Open |
 | PG-059 | Two separate Chainlit apps for POC | M4 (underwriter_chat) and M5 (compliance_review_agent) are separate apps | Single app with workflow selector | Combine into one Chainlit app with dropdown: deterministic vs agentic | Open |
-| PG-060 | No autolog verification for Responses API | `mlflow.openai.autolog()` may not fully capture Responses API tool call rounds | Verified autolog coverage with child spans for each tool call | Hands-on verification; fall back to manual spans if needed | Open |
+| PG-060 | No autolog verification for Responses API | `mlflow.openai.autolog()` may not fully capture Responses API tool call rounds | Verified autolog coverage with child spans for each tool call | Verified: `mlflow.openai.autolog()` captures tool calls. Auth resolved via `RequestHeaderProvider` with SA token + workspace header. | **Closed** (M5) |
 
 ---
 

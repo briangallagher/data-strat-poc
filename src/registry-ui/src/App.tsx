@@ -78,7 +78,7 @@ function AppNav() {
             )}
             {links.kfp_dashboard && links.kfp_namespace && (
               <NavItem>
-                <a href={`${links.kfp_dashboard}/pipelineRuns/${links.kfp_namespace}`} target="_blank" rel="noopener noreferrer">KFP Pipelines ↗</a>
+                <a href={`${links.kfp_dashboard}/develop-train/pipelines/runs/${links.kfp_namespace}`} target="_blank" rel="noopener noreferrer">KFP Pipelines ↗</a>
               </NavItem>
             )}
           </NavGroup>

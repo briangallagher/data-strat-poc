@@ -132,7 +132,7 @@ export function ImpactAnalysisPage() {
                         kfpBase ? (
                           <a
                             key={id}
-                            href={`${kfpBase.dashboard}/pipelineRuns/${kfpBase.namespace}/runs/${id}/details`}
+                            href={`${kfpBase.dashboard}/develop-train/pipelines/runs/${kfpBase.namespace}/runs/${id}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{ marginRight: 4 }}

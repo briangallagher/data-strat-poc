@@ -2,7 +2,7 @@
 
 ## What This Is
 
-The Document Registry is a FastAPI service backed by PostgreSQL that provides stable canonical identity for every document in the system. It stores metadata, tracks collection membership, and derives OpenLineage identity — making it the single source of truth the ingest pipeline consults before processing (ADR-010). It includes a Python SDK for programmatic access and a PatternFly UI for browsing and collection management.
+The Document Registry is a FastAPI service backed by PostgreSQL that provides stable canonical identity for every document in the system. It stores metadata, tracks collection membership, and derives OpenLineage identity — making it the single source of truth the ingest pipeline consults before processing (ADR-010). Starting in M4, the registry also serves as a unified provenance portal — federating MLflow traces, Marquez lineage data, and external observability links into a single UI. It includes a Python SDK for programmatic access and a PatternFly UI for browsing, collection management, and provenance exploration.
 
 ## Architecture
 
@@ -17,14 +17,14 @@ The Document Registry is a FastAPI service backed by PostgreSQL that provides st
                            ┌──────▼──────┐
                            │  FastAPI    │
                            │  :8080      │
-                           └──────┬──────┘
-                                  │
-                           ┌──────▼──────┐
-                           │ PostgreSQL  │
-                           │ doc_registry│
-                           │ database    │
-                           └─────────────┘
-                           (shared Marquez PG)
+                           └──┬────┬───┬─┘
+                              │    │   │
+                 ┌────────────┘    │   └────────────┐
+                 ▼                 ▼                 ▼
+           ┌──────────┐     ┌──────────┐     ┌──────────┐
+           │PostgreSQL│     │  MLflow   │     │ Marquez  │
+           │doc_regist│     │ (traces)  │     │(lineage) │
+           └──────────┘     └──────────┘     └──────────┘
 ```
 
 - **FastAPI backend** — `src/registry/` (app.py, models.py, db.py, enrichment.py, lineage.py)
@@ -95,6 +95,11 @@ The Document Registry is a FastAPI service backed by PostgreSQL that provides st
 | `GET` | `/api/v1/collections/{name}` | Get collection detail with members |
 | `POST` | `/api/v1/collections/{name}/assign` | Assign documents to a collection |
 | `DELETE` | `/api/v1/collections/{name}/documents/{doc_id}` | Remove a document from a collection |
+| `GET` | `/api/v1/provenance/traces` | List MLflow traces across experiments |
+| `GET` | `/api/v1/provenance/traces/{trace_id}` | Detailed trace with spans |
+| `GET` | `/api/v1/provenance/apps` | List applications (from MLflow tags + Marquez) |
+| `GET` | `/api/v1/provenance/collection/{name}/health` | Collection health metrics |
+| `GET` | `/api/v1/provenance/links` | External observability URLs (Marquez, MLflow) |
 
 ## Identity Resolution
 
@@ -185,6 +190,48 @@ client.assign_to_collection("iso_forms", doc_ids=["if-001", "if-002", "if-003"])
 - **Manifests:** `manifests/registry/` (Deployment, Service, Route, PG init Job)
 - **Route:** `doc-registry-data-strat-poc.apps.dev.aip-ft.rh-ods.com`
 
+## Provenance Portal (M4/M5)
+
+The registry aggregates provenance data from three sources: its own PostgreSQL database (document metadata, collections), MLflow (execution traces), and Marquez (dataset/job lineage). This federation gives users a single place to understand what happened to a document — from registration through ingest, chunking, embedding, and downstream consumption.
+
+### Application Discovery
+
+Applications are discovered by merging two signals:
+
+- **MLflow trace tags** — traces tagged with `app_name` and `workflow` identify which application produced the trace
+- **Marquez APPLICATION jobs** — jobs of type `APPLICATION` in Marquez represent deployed consumers
+
+The registry merges these into a unified application list exposed via `/api/v1/provenance/apps`.
+
+### Trace Extraction
+
+Trace data is extracted from MLflow experiments and normalised into a common span model. Two primary formats are handled:
+
+- **OpenAI chat format** — used by agentic workflows; spans contain `messages[]` arrays with role/content pairs
+- **LangChain format** — used by deterministic chains; spans follow the LangChain callback structure
+
+MLflow truncates span input/output attributes to 250 characters. The extraction layer applies regex fallbacks to reconstruct full payloads where possible (e.g. extracting a complete `query` string from a truncated JSON blob).
+
+### Multi-Experiment Support
+
+The registry can federate traces across multiple MLflow experiments. Configure via the `MLFLOW_EXPERIMENT_NAMES` environment variable (comma-separated list). When set, the provenance endpoints query all listed experiments and merge results.
+
+### UI Integration
+
+The PatternFly sidebar includes external links to:
+
+- **Marquez Lineage UI** — deep-link to the lineage graph for a given dataset or job
+- **MLflow UI** — deep-link to the experiment/trace view
+
+### Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `MLFLOW_TRACKING_URI` | MLflow server URL for trace queries |
+| `MARQUEZ_URL` | Marquez API base URL for lineage queries |
+| `MARQUEZ_WEB_URL` | Marquez web UI base URL for external links |
+| `MLFLOW_EXPERIMENT_NAMES` | Comma-separated list of experiments to federate |
+
 ## Production Gaps
 
 | ID | Gap | Impact |
@@ -195,6 +242,7 @@ client.assign_to_collection("iso_forms", doc_ids=["if-001", "if-002", "if-003"])
 | PG-029 | Registry has no HA/failover | Single PG, shared with Marquez |
 | PG-030 | No deep schema introspection | Only file-level metadata; no content-level extraction |
 | PG-031 | Registry UI has no auth | Anyone with route access can modify data |
+| PG-057 | Provenance queries are synchronous | High trace volume could slow registry API |
 
 ## Design Decisions
 

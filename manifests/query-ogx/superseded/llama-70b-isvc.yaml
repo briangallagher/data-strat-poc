@@ -1,0 +1,30 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: llama-70b
+  namespace: data-strat-poc
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    serving.kserve.io/deploymentMode: RawDeployment
+spec:
+  predictor:
+    model:
+      modelFormat:
+        name: vLLM
+      runtime: vllm-cuda-runtime
+      storageUri: "hf://meta-llama/Llama-3.1-70B-Instruct"
+      args:
+        - "--max-model-len=8192"
+        - "--tensor-parallel-size=2"
+        - "--enable-auto-tool-choice"
+        - "--tool-call-parser=llama3_json"
+      storage:
+        key: hf-creds
+    resources:
+      requests:
+        cpu: "4"
+        memory: "48Gi"
+        nvidia.com/gpu: "2"
+      limits:
+        nvidia.com/gpu: "2"

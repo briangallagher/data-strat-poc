@@ -2,7 +2,7 @@
 
 Step-by-step guide to deploy the system from scratch. Start here after confirming all [prerequisites](prerequisites.md).
 
-**Last Updated:** 2026-05-25 (M2 complete — lineage + MLflow added)
+**Last Updated:** 2026-05-28 (M5 complete)
 
 ## Deployment Order
 
@@ -23,6 +23,13 @@ Components must be deployed in this order due to dependencies:
 12. Milvus collection setup     (auto-created by pipeline; embedding via local model)
 13. Compile + upload pipeline   (needs DSPA + pipelines-components fork)
 14. Run pipeline                (see runbook)
+15. Document Registry (M3)       (needs shared PG from Marquez)
+16. Model Serving (M4/M5)
+    a. Granite Embedding ISVC    (KServe — for vector embedding)
+    b. Hermes 70B FP8 vLLM      (raw Deployment — LLM inference)
+17. MCP Knowledge Base server    (M4 — Milvus tool server)
+18. OGX LlamaStack              (M5 — agentic orchestration)
+19. Chainlit Compliance Review UI (M4/M5 — query frontend)
 ```
 
 ## Step 1: Create Namespace and Base Resources
@@ -171,6 +178,16 @@ oc get pvc -n data-strat-poc
 
 echo "=== Routes ==="
 oc get routes -n data-strat-poc
+
+echo "=== Model Serving ==="
+oc get deployment llama-70b-vllm -n data-strat-poc
+oc get inferenceservice -n data-strat-poc
+
+echo "=== Query Stack ==="
+oc get deployment mcp-knowledge-base compliance-review-ui ogx-compliance -n data-strat-poc
+
+echo "=== Registry ==="
+oc get deployment doc-registry -n data-strat-poc
 ```
 
 **Expected:** All pods Running, Milvus service on port 19530, DSPA ready, PVCs bound, DSP route available.
@@ -247,6 +264,9 @@ git -C ~/dev/odh/pipelines-components diff m1-p1..m1-p2
 | `m1-p2` | 2026-05-25 | M1 Phase 2: Full corpus (11 PDFs, 312 vectors), idempotency verified |
 | `m1-complete` | 2026-05-25 | M1 milestone sign-off |
 | `m2-complete` | 2026-05-25 | M2 milestone sign-off: lineage + MLflow |
+| `m3-complete` | 2026-05-26 | M3: Document Registry + connectors |
+| `m4-complete` | 2026-05-27 | M4: Deterministic RAG query layer |
+| `m5-complete` | 2026-05-28 | M5: Agentic RAG + model upgrade + registry hardening |
 
 ## M2: Marquez + Lineage Configuration
 
@@ -323,6 +343,45 @@ oc get route mlflow-ui -n redhat-ods-applications
 ```
 
 **Access from pipeline pods:** Requires SA token + `X-Mlflow-Workspace: data-strat-poc` header. See [MLflow integration](../technical/mlflow-integration.md) for details. Note: this is currently a known limitation (PG-024).
+
+## M3: Document Registry
+
+```bash
+oc apply -f manifests/registry/deployment.yaml -n data-strat-poc
+oc rollout status deployment/doc-registry -n data-strat-poc --timeout=2m
+```
+
+**Route:** `doc-registry-data-strat-poc.apps.dev.aip-ft.rh-ods.com`
+
+## M4/M5: Model Serving
+
+```bash
+# Embedding model (KServe)
+oc apply -f manifests/model-serving/serving-runtime.yaml -n data-strat-poc
+oc apply -f manifests/model-serving/granite-embedding-isvc.yaml -n data-strat-poc
+
+# LLM — Hermes 70B FP8 via raw Deployment (bypasses KServe storage initializer)
+oc apply -f manifests/query-ogx/hermes-70b-fp8-vllm.yaml -n data-strat-poc
+oc rollout status deployment/llama-70b-vllm -n data-strat-poc --timeout=10m
+```
+
+**Note:** The Hermes model is ~70GB and downloads on first start. Allow 5-10 minutes. Requires 1x A100-80GB GPU with ephemeral-storage: 80Gi.
+
+## M4/M5: Query Stack
+
+```bash
+# MCP server (Milvus tools via SSE)
+oc apply -f manifests/query-ogx/mcp-server.yaml -n data-strat-poc
+
+# OGX LlamaStack (agentic orchestration)
+oc apply -f manifests/query-ogx/ogx-config.yaml -n data-strat-poc
+oc apply -f manifests/query-ogx/ogx-llamastack.yaml -n data-strat-poc
+
+# Chainlit UI
+oc apply -f manifests/query-ogx/chainlit-app.yaml -n data-strat-poc
+```
+
+**Route:** `compliance-review-ui-data-strat-poc.apps.dev.aip-ft.rh-ods.com`
 
 ---
 

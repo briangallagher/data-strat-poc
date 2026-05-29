@@ -2,7 +2,7 @@
 
 High-level architecture for the Scenario B P&C Underwriting Knowledge Assistant on RHOAI.
 
-**Last Updated:** 2026-05-22 (M0 — target architecture; components deployed incrementally per milestone)
+**Last Updated:** 2026-05-28 (M5 complete)
 
 ## System Context (C4 Level 1)
 
@@ -82,10 +82,16 @@ flowchart TB
         PG["PostgreSQL\n(Metadata)"]
     end
 
-    subgraph query ["Query Path (M4)"]
-        OGX["OGX\n(Responses API)"]
-        LLM["Granite LLM\n(vLLM / KServe)"]
-        UI["Demo UI\n(Gradio)"]
+    subgraph query ["Query Path (M4 + M5)"]
+        LANG["LangGraph Agent\n(Deterministic RAG)"]
+        MCP_Q["MCP Server\n(Milvus tools)"]
+        OGX["OGX\n(Agentic RAG via vLLM)"]
+        LLM["Hermes 70B FP8\n(vLLM Deployment)"]
+        UI["Chainlit\n(Compliance Review)"]
+    end
+
+    subgraph registry ["Registry"]
+        REG_SVC["Document Registry\n(FastAPI + React)"]
     end
 
     subgraph observability ["Observability (M2)"]
@@ -105,14 +111,22 @@ flowchart TB
     KFP -->|"embed + insert"| MILVUS
     KFP -->|"embed"| EMB_SVC
 
-    UI -->|"user query"| OGX
-    OGX -->|"retrieve"| MILVUS
+    UI -->|"deterministic query"| LANG
+    UI -->|"agentic query"| OGX
+    LANG -->|"tool call"| MCP_Q
+    OGX -->|"tool call (MCP/SSE)"| MCP_Q
+    MCP_Q -->|"search"| MILVUS
+    LANG -->|"generate"| LLM
     OGX -->|"generate"| LLM
-    OGX -->|"cited answer"| UI
 
     KFP -->|"run tracking"| MLFLOW
     KFP -->|"lineage events"| MARQUEZ
     OGX -->|"query traces"| MLFLOW
+    LANG -->|"query traces"| MLFLOW
+
+    REG_SVC -->|"read"| PG
+    REG_SVC -->|"provenance"| MLFLOW
+    REG_SVC -->|"lineage"| MARQUEZ
 
     MLFLOW --> PG
     MARQUEZ --> PG
@@ -122,18 +136,21 @@ flowchart TB
     classDef queryNode fill:#E8F5E9,stroke:#2E7D32,color:#212121
     classDef obsNode fill:#F3E5F5,stroke:#6A1B9A,color:#212121
     classDef connNode fill:#FFEBEE,stroke:#C62828,color:#212121
+    classDef regNode fill:#FFF8E1,stroke:#F9A825,color:#212121
 
     class KFP,RAY,EMB_SVC ingestNode
     class MILVUS,MINIO,PG storageNode
-    class OGX,LLM,UI queryNode
+    class LANG,MCP_Q,OGX,LLM,UI queryNode
     class MLFLOW,MARQUEZ obsNode
     class CONN connNode
+    class REG_SVC regNode
 ```
 
 **Reading guide:**
 - Blue = ingest pipeline components (M1)
 - Orange = storage layer
-- Green = query path components (M4)
+- Green = query path components (M4 + M5)
+- Yellow/Amber = registry
 - Purple = observability (M2)
 - Red = connectors (M3)
 - Data flows left-to-right for ingest, top-to-bottom for query
@@ -151,9 +168,12 @@ flowchart TB
 | Marquez | Marquez 0.51+ | M2 | Deployment | OpenLineage backend, lineage graph |
 | PostgreSQL | PostgreSQL 15+ | M2 | Deployment | Backend for MLflow and Marquez |
 | Connector Framework | Python (pip package) | M3 | KFP component | Data source acquisition |
-| OGX | OGX (RHOAI) | M4 | RHOAI managed | RAG retrieval + generation via Responses API |
-| Granite LLM | Granite 3.1-8B/70B | M4 | KServe InferenceService | LLM inference for answer generation |
-| Demo UI | Gradio | M4 | Deployment | User-facing query interface |
+| OGX | OGX (RHOAI) | M5 | RHOAI managed | Agentic RAG via Responses API with server-side MCP tool execution |
+| Hermes 70B FP8 | NousResearch/Hermes-3-Llama-3.1-70B-FP8, vLLM | M5 | Raw Kubernetes Deployment | LLM inference for answer generation (native tool calling) |
+| Chainlit | Chainlit 1.x | M4 | Deployment | Chat-based UI for both deterministic and agentic RAG |
+| LangGraph Agent | LangGraph, LangChain | M4 | Part of Chainlit pod | Deterministic RAG agent with fixed retrieve-then-generate graph |
+| MCP Server | FastMCP (Python) | M4 | Deployment | Tool server exposing Milvus search via SSE for both LangGraph and OGX |
+| Document Registry | FastAPI, PostgreSQL, React | M3 | Deployment | Document identity, collection management, provenance portal |
 
 ## Data Flow
 
@@ -170,11 +190,16 @@ Each vector in Milvus carries:
 - `chunk_text` — raw text for retrieval
 - Standard metadata (LOB, doc type, effective date, etc.)
 
-### Query Path (M4)
+### Query Path (M4 + M5)
 
 ```
-User Query → OGX Responses API → Milvus (similarity search) → Retrieved Chunks
-    → Granite LLM (cited answer generation) → User
+Workflow A (Deterministic RAG — M4):
+User Query → Chainlit → LangGraph Agent → MCP Server → Milvus (single collection)
+    → Hermes 70B FP8 (cited answer generation) → User
+
+Workflow B (Agentic RAG — M5):
+User Query → Chainlit → OGX Responses API → MCP Server (SSE) → Milvus (all 3 collections, multi-hop)
+    → Hermes 70B FP8 (synthesized compliance review) → User
 ```
 
 ### Lineage Path (M2+)

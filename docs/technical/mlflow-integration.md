@@ -2,13 +2,13 @@
 
 ## What This Is
 
-MLflow provides experiment tracking for the ingest pipeline — recording parameters, metrics, and artifacts for each pipeline run. In this project, MLflow is deployed via the RHOAI MLflow Operator (cluster-wide instance with per-namespace workspaces) and is used alongside Marquez (not as a replacement) for observability.
+MLflow serves dual roles in this project: **pipeline experiment tracking** (recording parameters, metrics, and artifacts for each ingest run) and **query-time tracing** (capturing GenAI traces for both deterministic and agentic RAG inference paths). Deployed via the RHOAI MLflow Operator (cluster-wide instance with per-namespace workspaces), MLflow is used alongside Marquez (not as a replacement) for observability. Last Updated: 2026-05-28 (M5 complete).
 
 ## Architecture Context
 
 MLflow sits alongside Marquez as a complementary observability system:
 
-- **MLflow:** Tracks *what happened* in a run — parameters used, metrics produced, model artifacts
+- **MLflow:** Tracks *what happened* in a run — parameters used, metrics produced, model artifacts — **and** captures GenAI traces from query-time inference paths
 - **Marquez:** Tracks *data flow* — which datasets were consumed and produced, by which jobs
 
 ```mermaid
@@ -18,13 +18,25 @@ graph LR
         IM[ingest_to_milvus]
     end
 
+    subgraph "Query Components"
+        LG["LangGraph Agent"]
+        OGX["OGX / vLLM"]
+    end
+
     subgraph "Observability"
-        MLF[MLflow<br/>params, metrics, artifacts]
+        MLF[MLflow<br/>params, metrics, artifacts, traces]
         MQ[Marquez<br/>lineage graph]
+    end
+
+    subgraph "Data Layer"
+        REG["Document Registry"]
     end
 
     PC -->|log params/metrics| MLF
     IM -->|log params/metrics| MLF
+    LG -->|"autolog traces"| MLF
+    OGX -->|"autolog traces"| MLF
+    REG -->|"read traces"| MLF
     PC -->|emit OL events| MQ
     IM -->|emit OL events| MQ
 
@@ -95,7 +107,7 @@ with mlflow.start_run():
     mlflow.log_metric("chunks_created", chunk_count)
 ```
 
-**Current limitation (PG-024):** The standard `mlflow` client doesn't natively support the `X-Mlflow-Workspace` header required by the RHOAI operator. This requires either a custom request hook or environment variable configuration that hasn't been validated in KFP pods. M2 verification confirmed that MLflow tracking from pipeline pods does not work without this configuration.
+**PG-024 update:** The `X-Mlflow-Workspace` header required by the RHOAI operator is now injected via a custom `RequestHeaderProvider` (see [RHOAI MLflow Auth for Query Pods](#rhoai-mlflow-auth-for-query-pods)). This is validated and working for query pods. KFP pod validation is still pending.
 
 ### Bridge Mode
 
@@ -130,6 +142,72 @@ This causes the `mlflow` client to emit OpenLineage events to Marquez for every 
 | `mlflow` (Python) | 2.x | Client library in pipeline components |
 | MLflow Operator | Part of RHOAI 3.4+ DSC | Deploys and manages MLflow |
 
+## Query-Time Tracing (M4/M5)
+
+### Deterministic RAG (M4)
+
+`mlflow.langchain.autolog()` captures the full LangGraph span tree for each query. Every retrieval, rerank, and generation step is recorded as a nested span.
+
+| Aspect | Detail |
+|--------|--------|
+| Autolog call | `mlflow.langchain.autolog()` |
+| Experiment name | `underwriter-chat-v3` |
+| Span structure | Full LangGraph span tree (retrieval → rerank → generation) |
+
+Each trace is enriched with tags for downstream consumption by the Document Registry:
+
+| Tag | Purpose |
+|-----|---------|
+| `doc_ids_cited` | Document IDs referenced in the response |
+| `pipeline_run_ids` | Ingest pipeline run(s) that produced the cited chunks |
+| `collection_queried` | Milvus collection searched |
+| `chunks_detail` | Serialised chunk metadata |
+| `answer_preview` | Truncated answer text |
+| `chunks_retrieved_count` | Number of chunks returned by retrieval |
+
+### Agentic RAG (M5)
+
+`mlflow.openai.autolog()` captures OpenAI-format traces for the agentic path. Tool calls are visible as `function_call` / `function_call_output` spans within the trace tree.
+
+| Aspect | Detail |
+|--------|--------|
+| Autolog call | `mlflow.openai.autolog()` |
+| Experiment name | `compliance-review-agent` |
+| Tag contract | Same as M4 (`doc_ids_cited`, `pipeline_run_ids`, etc.) |
+| Tool visibility | `function_call` and `function_call_output` spans |
+
+### RHOAI MLflow Auth for Query Pods
+
+Query pods (outside KFP) authenticate to the RHOAI MLflow instance using a custom `RequestHeaderProvider` class that injects the required headers on every request:
+
+```python
+class RHOAIHeaderProvider:
+    """Injects SA token + workspace header for RHOAI MLflow."""
+
+    def in_context(self):
+        return True
+
+    def request_headers(self):
+        token = open("/var/run/secrets/kubernetes.io/serviceaccount/token").read()
+        return {
+            "Authorization": f"Bearer {token}",
+            "X-Mlflow-Workspace": "data-strat-poc",
+        }
+```
+
+Activated via environment variable:
+
+```
+MLFLOW_TRACKING_REQUEST_HEADER_PROVIDER=<module>.RHOAIHeaderProvider
+```
+
+### MLflow API Truncation Caveat
+
+The `search_traces` API truncates `traceInputs` and `traceOutputs` to 250 characters. The Document Registry works around this via:
+
+1. **Tag-based extraction** — critical metadata is stored as trace tags (see tag table above), which are not truncated
+2. **Regex fallbacks** — for fields not available as tags, regex parsing extracts values from the truncated strings where possible
+
 ## Design Decisions
 
 - **ADR-004:** MLflow and Marquez are independent systems, correlated by `pipeline_run_id`
@@ -140,13 +218,13 @@ This causes the `mlflow` client to emit OpenLineage events to Marquez for every 
 | ID | Limitation | Impact |
 |----|-----------|--------|
 | PG-002 | MLflow auth relies on RHOAI operator patterns | External access requires kube-auth-proxy |
-| PG-024 | MLflow tracking may not work from KFP pods | SA token + workspace header combination unvalidated in DSP environment |
+| PG-024 | MLflow tracking from KFP pods requires RequestHeaderProvider | Resolved for query pods via custom `RequestHeaderProvider`; KFP pod validation still pending |
+| PG-060 | ~~MLflow auth for query pods~~ | **Closed** — resolved via `RequestHeaderProvider` injecting SA token + `X-Mlflow-Workspace` header |
 
 ## Future Considerations
 
-- **Query-time GenAI traces (M4):** MLflow's `mlflow.tracing` API will capture inference spans — prompt, retrieval, generation — with structured metadata. This is where MLflow becomes essential (Marquez doesn't handle request-level tracing).
+- ~~**Query-time GenAI traces (M4):**~~ Implemented — see [Query-Time Tracing (M4/M5)](#query-time-tracing-m4m5) above.
 - **Model registry integration:** MLflow model registry could track fine-tuned models alongside experiment runs, providing a full lineage from training data → model → deployed endpoint.
-- **Custom request hooks:** Implement `mlflow.set_http_request_hook()` to inject `X-Mlflow-Workspace` header, enabling transparent RHOAI operator auth from any MLflow client call.
 - **Artifact logging:** Log chunked JSONL files or embedding samples as MLflow artifacts for debugging and reproducibility.
 
 ## References
