@@ -166,7 +166,7 @@ Each pipeline run targets a single collection (DEC-008). The orchestrator trigge
 
 ### D6: S3Connector (real) + Confluence mock
 
-S3Connector works against MinIO (primary connector for M3). Confluence mock included as stretch — code exists from v1, low effort to port.
+S3Connector works against MinIO (primary connector for M3). Confluence mock included as stretch — code exists from the prior POC, low effort to port.
 
 ---
 

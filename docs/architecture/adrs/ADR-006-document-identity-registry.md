@@ -11,7 +11,7 @@ The POC needs stable document identity that persists across pipeline runs, file 
 ### Options Considered
 
 **Option 1: Convention-based identity (filename stems)**
-The v1/v2 approach — derive identity from filenames or URL slugs. Fragile: renaming a file or changing a source URL silently creates a new identity, orphaning all downstream lineage edges and Milvus vectors tied to the old name.
+The convention-based approach — derive identity from filenames or URL slugs. Fragile: renaming a file or changing a source URL silently creates a new identity, orphaning all downstream lineage edges and Milvus vectors tied to the old name.
 
 **Option 2: Manifest-only identity (static JSON)**
 Assign a `doc_id` in checked-in JSON manifest files. Better than convention, but no API surface — discoverability requires reading files, there's no way to query "all documents in collection X" at runtime, and no enforcement of uniqueness or format.

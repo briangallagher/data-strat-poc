@@ -28,7 +28,7 @@ High-level decisions made during the project. For significant architectural deci
 **Milestone:** M0
 **Status:** Decided
 
-**Context:** v1 split planning documentation across work-knowledge and the code repo. This created context-switching overhead and made it harder for new contributors to find things.
+**Context:** The initial approach split planning documentation across work-knowledge and the code repo. This created context-switching overhead and made it harder for new contributors to find things.
 
 **Decision:** All documentation lives in `data-strat-poc` — architecture, technical, functional, UX, operations, milestones. The work-knowledge repo tracks this as a project entry but doesn't host the planning docs.
 
@@ -39,7 +39,7 @@ High-level decisions made during the project. For significant architectural deci
 **Milestone:** M0
 **Status:** Decided
 
-**Context:** v1 built quickly and deferred production concerns (auth, RBAC, TLS, error handling). Gaps were discovered but not systematically tracked, making it hard to assess production readiness.
+**Context:** The initial approach built quickly and deferred production concerns (auth, RBAC, TLS, error handling). Gaps were discovered but not systematically tracked, making it hard to assess production readiness.
 
 **Decision:** Enterprise standard is the default expectation. Every deviation is logged in `production-gaps.md` with: what the gap is, why it exists, what production-grade looks like, and the path to close it. Updated at every milestone checkpoint.
 
@@ -50,7 +50,7 @@ High-level decisions made during the project. For significant architectural deci
 **Milestone:** M0
 **Status:** Decided
 
-**Context:** v1 built features sequentially without re-verifying previous phases. Regressions were discovered late.
+**Context:** Previous iterations built features sequentially without re-verifying previous phases. Regressions were discovered late.
 
 **Decision:** Every milestone includes an E2E verification gate. New capabilities are verified (small scale first, then scaled up) and all previous milestone capabilities are re-verified. Milestone checkpoint documents record verification evidence.
 
@@ -61,7 +61,7 @@ High-level decisions made during the project. For significant architectural deci
 **Milestone:** M0
 **Status:** Decided
 
-**Context:** v1 had flat docs/ with no clear separation between architecture, operations, and user-facing content. Finding the right document required knowing the project well.
+**Context:** The initial approach had flat docs/ with no clear separation between architecture, operations, and user-facing content. Finding the right document required knowing the project well.
 
 **Decision:** Six documentation tiers: Architecture (ADRs, system overview), Technical (component deep dives), Functional (use cases, requirements), User Experience (personas, journeys), Operations (prerequisites, runbooks, getting started), Milestones (plans, checkpoints). Conventions in `doc-standards.md`.
 

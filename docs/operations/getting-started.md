@@ -259,7 +259,7 @@ git -C ~/dev/odh/pipelines-components diff m1-p1..m1-p2
 | Tag | Date | Description |
 |-----|------|-------------|
 | `m0-complete` | 2026-05-25 | M0 documentation and planning complete |
-| `m1-p0` | 2026-05-25 | M1 Phase 0: Saad's baseline validated on cluster |
+| `m1-p0` | 2026-05-25 | M1 Phase 0: the Ray team's baseline validated on cluster |
 | `m1-p1` | 2026-05-25 | M1 Phase 1: Scenario B metadata adaptations verified (small scale) |
 | `m1-p2` | 2026-05-25 | M1 Phase 2: Full corpus (11 PDFs, 312 vectors), idempotency verified |
 | `m1-complete` | 2026-05-25 | M1 milestone sign-off |

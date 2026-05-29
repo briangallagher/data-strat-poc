@@ -236,6 +236,5 @@ Auditor: MLflow trace → pipeline_run_id → Marquez graph → source documents
 |--------|------|
 | DataStrategy Scenario B | [scenario-b-underwriting-knowledge.md](https://github.com/abiazett/DataStrategy/blob/main/data-strategy-proposal/scenarios/scenario-b-underwriting-knowledge/scenario-b-underwriting-knowledge.md) |
 | Five-pillar strategy | [RHAI-data-strategy-proposal.md](https://github.com/abiazett/DataStrategy/blob/main/data-strategy-proposal/RHAI-data-strategy-proposal.md) |
-| v1 POC architecture | [data-strategy-poc/docs/architecture.md](https://github.com/briangallagher/data-strategy-poc/blob/main/docs/architecture.md) |
-| Saad's pipeline components | [pipelines-components #53](https://github.com/opendatahub-io/pipelines-components/pull/53) |
+| the Ray team's pipeline components | [pipelines-components #53](https://github.com/opendatahub-io/pipelines-components/pull/53) |
 | ET lineage demo | [lineage-demo-pipeline](https://github.com/rh-waterford-et/lineage-demo-pipeline) |

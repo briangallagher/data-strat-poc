@@ -11,9 +11,9 @@ The ingest pipeline parses PDF documents with Docling and stores vector embeddin
 1. **How documents are chunked** — determines the granularity and quality of retrieval results
 2. **What the Milvus collection schema looks like** — determines what metadata is stored per vector and how it can be queried
 
-Saad's baseline (PR #53) uses a minimal schema: `id`, `source_file`, `chunk_index`, `text`, `embedding` with an IVF_FLAT index. This is sufficient for a generic RAG demo but lacks the metadata needed for Scenario B's lineage, regulatory compliance, and multi-collection architecture.
+the Ray team's baseline (PR #53) uses a minimal schema: `id`, `source_file`, `chunk_index`, `text`, `embedding` with an IVF_FLAT index. This is sufficient for a generic RAG demo but lacks the metadata needed for Scenario B's lineage, regulatory compliance, and multi-collection architecture.
 
-v1 POC used OGX Vector I/O which abstracted the schema — we had less control over what was stored. Moving to direct Milvus writes (ADR-003) gives us full control.
+The initial approach used OGX Vector I/O which abstracted the schema — we had less control over what was stored. Moving to direct Milvus writes (ADR-003) gives us full control.
 
 ### Requirements from Scenario B
 
@@ -31,7 +31,7 @@ v1 POC used OGX Vector I/O which abstracted the schema — we had less control o
 - Tokenizer: `ibm-granite/granite-embedding-125m-english` — matches the embedding model
 - Structure-aware: Docling preserves document structure (sections, tables, paragraphs) and HybridChunker respects these boundaries
 
-This is Saad's default chunking approach, unchanged. The chunking itself works well — Docling's layout detection (97.9% table accuracy per the DataStrategy research) combined with HybridChunker produces clean, structure-aware chunks.
+This is the Ray team's default chunking approach, unchanged. The chunking itself works well — Docling's layout detection (97.9% table accuracy per the DataStrategy research) combined with HybridChunker produces clean, structure-aware chunks.
 
 **What we did not change:** chunk overlap, chunk merging, or table-specific chunking strategies. These are optimisation targets for M4 (query quality) or M5 (hardening), not M1.
 
@@ -115,10 +115,10 @@ For M1, only `underwriting_guidelines` is created. Others are added when relevan
 
 | Option | Pros | Cons | Why Not |
 |--------|------|------|---------|
-| Saad's minimal schema (source_file, chunk_index, text) | Simple, proven | No lineage, no metadata filtering, no multi-collection | Doesn't meet Scenario B requirements |
+| the Ray team's minimal schema (source_file, chunk_index, text) | Simple, proven | No lineage, no metadata filtering, no multi-collection | Doesn't meet Scenario B requirements |
 | Single collection with partition key on doc_type | Fewer collections to manage | Milvus partition keys have cardinality limits; mixing doc types complicates schema | Separate collections are cleaner for different document types |
 | Store metadata in a separate registry (not in Milvus) | Keeps vectors lean | Requires join at query time; `pipeline_run_id` must be on the vector for lineage bridging | Performance and complexity cost outweighs storage savings |
-| IVF_FLAT index (Saad's default) | Fast builds, good for large collections | Requires training step, degrades with incremental inserts | HNSW is better for our collection sizes (<1M vectors) |
+| IVF_FLAT index (the Ray team's default) | Fast builds, good for large collections | Requires training step, degrades with incremental inserts | HNSW is better for our collection sizes (<1M vectors) |
 | HNSW with higher M (32) | Better recall | ~2x memory per vector | M=16 is sufficient for our embedding dimension (768) |
 
 ## Consequences
@@ -130,7 +130,7 @@ For M1, only `underwriting_guidelines` is created. Others are added when relevan
 - `pipeline_run_id` enables Marquez bridging in M2 without changing the schema
 - `source_document_id` enables document impact analysis (Chain 2) in future milestones
 
-**Current limitation (PG-020):** All documents in a single pipeline run receive the same `lob`, `doc_type`, and `effective_date` from pipeline parameters. Per-document metadata requires a manifest file approach (v1 pattern). This is acceptable for M1 verification but needs refinement for M3 (connectors) or Phase 2 (full corpus).
+**Current limitation (PG-020):** All documents in a single pipeline run receive the same `lob`, `doc_type`, and `effective_date` from pipeline parameters. Per-document metadata requires a manifest file approach. This is acceptable for M1 verification but needs refinement for M3 (connectors) or Phase 2 (full corpus).
 
 ## Future Considerations
 
@@ -145,10 +145,10 @@ For M1, only `underwriting_guidelines` is created. Others are added when relevan
 
 | Source | Link |
 |--------|------|
-| Saad's ingest component (baseline schema) | [pipelines-components PR #53](https://github.com/opendatahub-io/pipelines-components/pull/53) |
-| v1 POC collection design | `data-strategy-poc/docs/architecture.md` |
+| the Ray team's ingest component (baseline schema) | [pipelines-components PR #53](https://github.com/opendatahub-io/pipelines-components/pull/53) |
+| Prior POC collection design | `data-strategy-poc/docs/architecture.md` |
 | Scenario B document types | [DataStrategy scenario-b-underwriting-knowledge.md](https://github.com/abiazett/DataStrategy/blob/main/data-strategy-proposal/scenarios/scenario-b-underwriting-knowledge/scenario-b-underwriting-knowledge.md) |
 | Milvus HNSW index docs | [milvus.io/docs/index.md](https://milvus.io/docs/index.md) |
 | Lineage scenarios (Chain 1, Chain 2) | work-knowledge `projects/data-strategy/docs/poc/lineage/lineage-scenarios.md` |
-| DEC-014 naming conventions (v1) | `data-strategy-poc/docs/decisions.md` |
+| DEC-014 naming conventions (prior) | `data-strategy-poc/docs/decisions.md` |
 | PG-007 (hybrid search gap) | `docs/production-gaps.md` |

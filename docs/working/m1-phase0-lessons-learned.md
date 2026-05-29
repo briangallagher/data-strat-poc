@@ -83,7 +83,7 @@ custom_api.create_namespaced_custom_object(
 
 ### Milvus Helm
 
-- **SCC:** `anyuid` SCC required for Milvus pods (same as v1)
+- **SCC:** `anyuid` SCC required for Milvus pods (known requirement)
 - **Service name:** Helm creates `milvus` service, NOT `milvus-standalone`. The pipeline default `milvus_host` parameter is wrong — must use `milvus.<namespace>.svc.cluster.local`
 - **MinIO storage:** Helm defaults to 500Gi for Milvus's internal MinIO. Way oversized for POC — should set to 10-50Gi
 - **Deployment time:** ~2 minutes for all Milvus components to be ready
@@ -124,7 +124,7 @@ custom_api.create_namespaced_custom_object(
 
 ---
 
-## What Saad's Pipeline Does Well
+## What the Ray team's Pipeline Does Well
 
 - **Parallel chains:** Data chain (parse → ingest) and model chain (download → deploy) run independently. Data chain succeeds even when model chain is blocked.
 - **S3 intermediate storage:** Chunks in S3 as JSONL between parse and ingest steps. Enables retry of ingest without re-parsing.
@@ -177,6 +177,6 @@ custom_api.create_namespaced_custom_object(
 | Item | Location |
 |------|----------|
 | Fork branch | https://github.com/briangallagher/pipelines-components/tree/data-strat-poc |
-| Saad's original PR | https://github.com/opendatahub-io/pipelines-components/pull/53 |
+| the Ray team's original PR | https://github.com/opendatahub-io/pipelines-components/pull/53 |
 | deploy-model-openshift skill | `~/dev/git-repos/team-kubeflow-devx/skills/deploy-model-openshift/SKILL.md` |
 | KFP setup skill | `~/dev/git-repos/team-kubeflow-devx/skills/KFP-setup/SKILL.md` |

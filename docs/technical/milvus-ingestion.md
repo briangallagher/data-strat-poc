@@ -98,7 +98,7 @@ The collection uses an HNSW (Hierarchical Navigable Small World) index:
 | `efConstruction` | 256 | Build-time quality; higher = better index at cost of slower builds |
 | `metric_type` | COSINE | Cosine similarity for normalised embeddings |
 
-HNSW was chosen over Saad's default IVF_FLAT because it requires no training step, supports incremental inserts without degradation, and offers better recall at low latency for collections under 1M vectors. See ADR-002 for the full comparison.
+HNSW was chosen over the Ray team's default IVF_FLAT because it requires no training step, supports incremental inserts without degradation, and offers better recall at low latency for collections under 1M vectors. See ADR-002 for the full comparison.
 
 ### 6. Metadata Flow
 
@@ -208,7 +208,7 @@ Vectors are inserted in batches to manage memory and handle large corpora:
 |--------|------|
 | ADR-002 (schema + chunking design) | [ADR-002-chunking-milvus-schema.md](../architecture/adrs/ADR-002-chunking-milvus-schema.md) |
 | ADR-003 (OGX role — why direct writes) | [ADR-003-ogx-role.md](../architecture/adrs/ADR-003-ogx-role.md) |
-| Saad's ingest component (baseline) | [pipelines-components #53](https://github.com/opendatahub-io/pipelines-components/pull/53) |
+| the Ray team's ingest component (baseline) | [pipelines-components #53](https://github.com/opendatahub-io/pipelines-components/pull/53) |
 | Fork branch (with fixes) | [briangallagher/pipelines-components:data-strat-poc](https://github.com/briangallagher/pipelines-components/tree/data-strat-poc) |
 | Milvus HNSW index docs | [milvus.io/docs/index.md](https://milvus.io/docs/index.md) |
 | RayData + Docling (previous step) | [raydata-docling.md](raydata-docling.md) |

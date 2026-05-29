@@ -7,7 +7,7 @@
 M3 adds document acquisition from source systems. The design must cleanly separate responsibilities so each can evolve independently. We evaluated:
 
 - **ET team's approach** — single pipeline, Feast handles everything
-- **v1's approach** — connectors did routing
+- **Prior approach** — connectors did routing
 - **DataStrategy mapping** — how this maps to the five pillars
 
 ## Decision

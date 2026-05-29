@@ -1,4 +1,4 @@
-# Scenario B Assessment: POC v2 vs Data Strategy Proposal
+# Scenario B Assessment: POC vs Data Strategy Proposal
 
 **Date:** 2026-05-28
 **POC Status:** M4 Complete, M5 Planned
@@ -259,7 +259,7 @@ The POC delivers a working chat UI (Chainlit) and a provenance portal (Registry 
 |-----------------|-----------|-----------|-----------|
 | OGX Responses API for all query modes | LangGraph + MCP for deterministic RAG (M4); OGX reserved for agentic RAG (M5) | OGX's strength is agent orchestration, not deterministic retrieval. LangGraph + `mlflow.langchain.autolog()` gives full span tree automatically — dramatically better P4 (lineage) story for Workflow A. OGX evaluated where its value is highest (multi-hop, Workflow B). | DEC-010 |
 | OpenLineage Event 3 for query lineage | MLflow traces for query lineage; Marquez for pipeline lineage only | Marquez models datasets/jobs, not requests. Per-query OL events would show "collection was queried" but not which chunks/docs answered which question. MLflow traces are purpose-built for request-level provenance. | DEC-009 |
-| OGX for ingest (Vector I/O) | Direct Milvus writes (Saad's upstream pattern) | OGX Vector I/O is opaque for lineage (no OL emission), Dev Preview, couples pipeline to OGX availability. Direct writes give full control over metadata stamping, lineage emission, and error handling. | ADR-003 |
+| OGX for ingest (Vector I/O) | Direct Milvus writes (the Ray team's upstream pattern) | OGX Vector I/O is opaque for lineage (no OL emission), Dev Preview, couples pipeline to OGX availability. Direct writes give full control over metadata stamping, lineage emission, and error handling. | ADR-003 |
 | MLflow-Marquez bridge as primary lineage mechanism | Bridge OFF; direct OL emission from components | Bridge creates synthetic/duplicate nodes; naming not controllable; direct emission is cleaner and more predictable. Bridge available as opt-in for evaluation. | ADR-004 |
 | Single unified pipeline (ingestion → processing → storage) | Separated concerns: Register → Build Collection → Pipeline Run (Acquire → Parse → Ingest) | Spec's 3-phase pipeline conflates curation with execution. Separating them enables: documents registered without processing, collections curated without triggering ingest, pipelines re-run without re-registering. | Collection lifecycle, ADR-010, ADR-012 |
 

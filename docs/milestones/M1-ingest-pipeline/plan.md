@@ -6,11 +6,11 @@
 
 ## Goal
 
-Deploy and verify a KFP-orchestrated document ingest pipeline that parses PDFs with RayData + Docling, embeds chunks via vLLM, and stores vectors in Milvus — starting by validating Saad's components standalone, then incrementally adapting for Scenario B requirements.
+Deploy and verify a KFP-orchestrated document ingest pipeline that parses PDFs with RayData + Docling, embeds chunks via vLLM, and stores vectors in Milvus — starting by validating the Ray team's components standalone, then incrementally adapting for Scenario B requirements.
 
 ## Objectives
 
-1. Saad's pipeline components (PR #53) run successfully as-is on our cluster (Phase 0 baseline)
+1. the Ray team's pipeline components (PR #53) run successfully as-is on our cluster (Phase 0 baseline)
 2. Incremental changes add `pipeline_run_id`, `source_document_id`, Scenario B metadata, and collection design
 3. Pipeline is idempotent — re-running on the same corpus produces the same result
 4. Verified at two scales: small (2-3 PDFs) and medium (10-15 PDFs)
@@ -18,22 +18,22 @@ Deploy and verify a KFP-orchestrated document ingest pipeline that parses PDFs w
 
 ## Approach: Validate First, Adapt Incrementally
 
-**Phase 0 (Baseline):** Deploy Saad's pipeline components exactly as shipped in PR #53. Run them with his default configuration and a small test corpus. Verify the pipeline works end-to-end before changing anything. This proves the infrastructure and identifies any cluster-specific issues.
+**Phase 0 (Baseline):** Deploy the Ray team's pipeline components exactly as shipped in PR #53. Run them with his default configuration and a small test corpus. Verify the pipeline works end-to-end before changing anything. This proves the infrastructure and identifies any cluster-specific issues.
 
 **Phase 1 (Adapt):** Incrementally modify components for Scenario B:
 - Add `pipeline_run_id` and `source_document_id` to Milvus vectors
 - Adjust Milvus collection schema for P&C metadata (LOB, doc type, effective date)
 - Adjust chunking strategy if needed (HybridChunker tuning)
-- Add our document corpus alongside Saad's test data
+- Add our document corpus alongside the Ray team's test data
 
-**Phase 2 (Verify):** Run at medium scale with v1's P&C corpus. Verify quality, performance, idempotency.
+**Phase 2 (Verify):** Run at medium scale with the full P&C corpus. Verify quality, performance, idempotency.
 
 ## Scope
 
 ### In Scope
 
 - **Infrastructure manifests:** Milvus (Helm), KubeRay, DSPA, MinIO/S3, embedding model InferenceService
-- **Saad's KFP pipeline components** (from merged PR #53):
+- **the Ray team's KFP pipeline components** (from merged PR #53):
   - `parse_and_chunk` — RayJob + Docling parsing + HybridChunker → S3 JSONL
   - `ingest_to_milvus` — read chunks from S3, embed via vLLM endpoint, insert into Milvus
   - `download_model` — HuggingFace model download to PVC with cache-skip sentinel
@@ -41,7 +41,7 @@ Deploy and verify a KFP-orchestrated document ingest pipeline that parses PDFs w
 - **KFP pipeline definition** orchestrating the above with parallel data/model chains
 - **Incremental adaptations** for Scenario B (metadata, collection design, corpus)
 - **Milvus collection design:** schema, partitioning by LOB, HNSW index, cosine similarity
-- **Document corpus:** Saad's test data (Phase 0) + v1's 15 public-domain P&C docs (Phase 1-2)
+- **Document corpus:** the Ray team's test data (Phase 0) + 15 public-domain P&C docs (Phase 1-2)
 - **Runbook:** `docs/operations/runbooks/run-ingest-pipeline.md`
 - **Technical deep dives:** `docs/technical/raydata-docling.md`, `docs/technical/milvus-ingestion.md`
 - **ADRs:** ADR-001 (RayData+Docling pipeline design), ADR-002 (chunking+Milvus)
@@ -59,8 +59,8 @@ Deploy and verify a KFP-orchestrated document ingest pipeline that parses PDFs w
 ## Acceptance Criteria
 
 - [x] All infrastructure manifests deploy cleanly to `data-strat-poc` namespace
-- [x] **Phase 0 (Saad's baseline):**
-  - [x] Saad's pipeline data chain runs on our cluster (with auth fixes on fork branch)
+- [x] **Phase 0 (the Ray team's baseline):**
+  - [x] the Ray team's pipeline data chain runs on our cluster (with auth fixes on fork branch)
   - [x] parse_and_chunk + ingest_to_milvus complete (data chain green)
   - [x] Milvus collection queryable (5 chunks, real P&C content)
   - [x] Issues documented (`docs/working/m1-phase0-lessons-learned.md`, PG-014 through PG-019)
@@ -68,11 +68,11 @@ Deploy and verify a KFP-orchestrated document ingest pipeline that parses PDFs w
 - [x] **Phase 1 (Scenario B adaptations):**
   - [x] Milvus collection schema includes: pipeline_run_id, source_document_id, chunk_text, LOB, doc_type, effective_date
   - [x] Every vector has `pipeline_run_id` set
-  - [x] Pipeline runs with 2-3 small P&C PDFs from v1 corpus
+  - [x] Pipeline runs with 2-3 small P&C PDFs
   - [x] Chunks are correct (manual inspection: text extracted, tables handled, structure preserved)
   - [x] Embeddings are sane (dimension matches model, non-zero, normalized)
 - [x] **Phase 2 (Medium scale):**
-  - [x] Pipeline handles full v1 corpus (11 docs) without failure
+  - [x] Pipeline handles full corpus (11 docs) without failure
   - [x] Edge cases handled: empty sections, large tables, multi-column layouts
   - [x] Pipeline is idempotent: re-run produces same chunk count (312) and same vectors
   - [x] Performance acceptable (~7 minutes for 11 docs — well under 15 min target)
@@ -96,9 +96,9 @@ Deploy and verify a KFP-orchestrated document ingest pipeline that parses PDFs w
 | 4 | Write embedding model InferenceService manifest | 1 hr | Skipped | RHOAI 3.4 vLLM lacks `--task=embedding` (PG-018). Local sentence-transformers in ingest_to_milvus works. |
 | 5 | Write KubeRay / RayCluster config | 1 hr | Done | KubeRay managed by RHOAI. RayJob created by parse_and_chunk component. |
 | 6 | Deploy all infrastructure to cluster | 2 hr | Done | All pods healthy. RBAC for pipeline SA created manually (PG-015). |
-| 7 | Prepare test data on PVC | 30 min | Done | 2 PDFs from v1 corpus uploaded via data-loader pod (UBI image, not ubi-minimal — needs tar). |
+| 7 | Prepare test data on PVC | 30 min | Done | 2 PDFs uploaded via data-loader pod (UBI image, not ubi-minimal — needs tar). |
 
-### Phase 0: Validate Saad's Baseline (tasks 8-11)
+### Phase 0: Validate the Ray team's Baseline (tasks 8-11)
 
 | # | Task | Effort | Status | Notes |
 |---|------|--------|--------|-------|
@@ -114,7 +114,7 @@ Deploy and verify a KFP-orchestrated document ingest pipeline that parses PDFs w
 | 12 | Design Milvus collection schema for Scenario B | 1 hr | Done | 10-field schema: id, source_file, source_document_id, pipeline_run_id, chunk_index, text, lob, doc_type, effective_date, embedding. ADR-002. |
 | 13 | Adapt `ingest_to_milvus` for Scenario B metadata | 2 hr | Done | Writes all 10 fields. pipeline_run_id added at ingest step. HNSW index (M=16, COSINE). |
 | 14 | Adapt `parse_and_chunk` JSONL output for metadata | 1 hr | Done | JSONL includes source_document_id (from filename) + metadata from env vars. PG-020 for per-doc metadata. |
-| 15 | Prepare v1 P&C corpus (small subset) in S3 | 30 min | Done | 2-3 small PDFs uploaded via data-loader pod. |
+| 15 | Prepare P&C corpus (small subset) in S3 | 30 min | Done | 2-3 small PDFs uploaded via data-loader pod. |
 | 16 | **Small-scale verification** | 2 hr | Done | All metadata fields present. pipeline_run_id links to KFP run. Similarity search returns relevant results. |
 | 17 | Fix issues from small-scale verification | 2-4 hr | Done | PG-020 identified (pipeline-level metadata). Schema and chunking work correctly. |
 | 18 | Write ADR-002 (chunking + Milvus collection design) | 1 hr | Done | ADR-002-chunking-milvus-schema.md. Covers schema, HNSW index, metadata flow, collection naming. |
@@ -123,7 +123,7 @@ Deploy and verify a KFP-orchestrated document ingest pipeline that parses PDFs w
 
 | # | Task | Effort | Status | Notes |
 |---|------|--------|--------|-------|
-| 19 | Upload full v1 corpus (10-15 PDFs) to S3 | 30 min | Done | 11 PDFs from v1 P&C corpus uploaded. |
+| 19 | Upload full corpus (10-15 PDFs) to S3 | 30 min | Done | 11 P&C PDFs uploaded. |
 | 20 | **Medium-scale verification** | 2 hr | Done | 11 PDFs → 312 vectors. ~7 min e2e. All edge cases handled. |
 | 21 | Fix issues from medium-scale verification | 2-4 hr | Done | No blocking issues at this scale. Performance within target (<15 min for 11 PDFs). |
 | 22 | **Idempotency verification** | 1 hr | Done | Re-run with `drop_existing=true` produces same 312 vectors. |
@@ -150,13 +150,13 @@ At M1 completion, assess each component for extraction potential per ADR-007 cri
 
 | Component | Current Location | Extraction Candidate? | Assessment Criteria |
 |-----------|-----------------|----------------------|---------------------|
-| `parse_and_chunk` | `pipelines/components/` (adapted from Saad) | **Contribute upstream** | If adaptations are general-purpose, PR to `opendatahub-io/pipelines-components` |
-| `ingest_to_milvus` | `pipelines/components/` (adapted from Saad) | **Contribute upstream** | Same — Scenario B metadata could be parameterised for reuse |
-| `download_model` | `pipelines/components/` (from Saad) | **No** (already upstream) | Minimal changes; use upstream directly |
-| `deploy_embedding_model` | `pipelines/components/` (from Saad) | **No** (already upstream) | Minimal changes; use upstream directly |
+| `parse_and_chunk` | `pipelines/components/` (adapted from the Ray team) | **Contribute upstream** | If adaptations are general-purpose, PR to `opendatahub-io/pipelines-components` |
+| `ingest_to_milvus` | `pipelines/components/` (adapted from the Ray team) | **Contribute upstream** | Same — Scenario B metadata could be parameterised for reuse |
+| `download_model` | `pipelines/components/` (from the Ray team) | **No** (already upstream) | Minimal changes; use upstream directly |
+| `deploy_embedding_model` | `pipelines/components/` (from the Ray team) | **No** (already upstream) | Minimal changes; use upstream directly |
 | KFP pipeline definition | `pipelines/` | **No** | Project-specific orchestration; not reusable |
 | Milvus Helm values | `manifests/milvus/` | **No** | Cluster-specific configuration |
-| Docling Ray worker image | `images/` (if custom) | **Evaluate** | If Saad's `quay.io/rhoai-szaher/docling-ray:latest` works, use it. If custom image needed, may warrant own repo + CI. |
+| Docling Ray worker image | `images/` (if custom) | **Evaluate** | If the Ray team's `quay.io/rhoai-szaher/docling-ray:latest` works, use it. If custom image needed, may warrant own repo + CI. |
 
 **Key question for M1:** Do our Scenario B adaptations to `parse_and_chunk` and `ingest_to_milvus` generalise (parameterised metadata fields) or specialise (P&C-specific logic)? If they generalise, contribute upstream. If they specialise, keep in this repo.
 
@@ -177,20 +177,20 @@ At M1 completion, assess each component for extraction potential per ADR-007 cri
 | GPU node (L40S/A100/H100, 24GB+ VRAM) | Cluster | Verify |
 | KubeRay operator installed | RHOAI | Installed via RHOAI |
 | Milvus operator or Helm chart | Zilliz (Certified Partner) | Available |
-| Saad's merged pipeline components | `opendatahub-io/pipelines-components` main | Available |
-| v1 document corpus (15 P&C PDFs) | v1 repo | Available at `data-strategy-poc/corpus/` |
+| the Ray team's merged pipeline components | `opendatahub-io/pipelines-components` main | Available |
+| P&C document corpus (15 PDFs) | Prior POC repo | Available at `data-strategy-poc/corpus/` |
 | HuggingFace token (gated model access) | Brian | Available |
 
 ## Risks
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
-| Saad's pipeline doesn't run on our cluster (image pulls, RBAC, SCC) | Medium | Medium | Phase 0 catches this early before any customisation |
-| Milvus Helm deployment issues (SCC, storage) | Medium | Medium | v1 solved these (DEC-008); reuse manifests |
-| Docling parsing failures on edge-case PDFs | Medium | Low | Phase 0 uses Saad's known-good data; P&C edge cases in Phase 1-2 |
+| the Ray team's pipeline doesn't run on our cluster (image pulls, RBAC, SCC) | Medium | Medium | Phase 0 catches this early before any customisation |
+| Milvus Helm deployment issues (SCC, storage) | Medium | Medium | Previously solved; reuse manifests |
+| Docling parsing failures on edge-case PDFs | Medium | Low | Phase 0 uses the Ray team's known-good data; P&C edge cases in Phase 1-2 |
 | RayJob scheduling issues (GPU contention, Kueue) | Medium | Medium | Use `bypass_kueue` flag initially |
 | Embedding model InferenceService not starting | Low | High | Verify GPU availability first; fall back to local sentence-transformers |
-| Scenario B metadata adaptations break Saad's components | Low | Medium | Incremental changes with verification after each; keep Saad's baseline as reference |
+| Scenario B metadata adaptations break the Ray team's components | Low | Medium | Incremental changes with verification after each; keep the Ray team's baseline as reference |
 
 ## Resource Requirements
 
@@ -205,15 +205,15 @@ At M1 completion, assess each component for extraction potential per ADR-007 cri
 
 ## Verification Plan
 
-### Phase 0: Saad's Baseline
+### Phase 0: the Ray team's Baseline
 
-**What:** Run Saad's pipeline exactly as shipped on our cluster.
+**What:** Run the Ray team's pipeline exactly as shipped on our cluster.
 
 **How:**
 1. Deploy infrastructure (Milvus, MinIO, DSPA, embedding ISVC, KubeRay)
-2. Clone Saad's components and pipeline from `opendatahub-io/pipelines-components`
+2. Clone the Ray team's components and pipeline from `opendatahub-io/pipelines-components`
 3. Compile and upload pipeline — no modifications
-4. Trigger pipeline with Saad's default parameters and test data
+4. Trigger pipeline with the Ray team's default parameters and test data
 5. Verify all steps green, Milvus queryable
 
 **Pass:** Pipeline completes, Milvus contains vectors, similarity search works.
@@ -235,7 +235,7 @@ At M1 completion, assess each component for extraction potential per ADR-007 cri
 
 ### Phase 2: Medium Scale (10-15 PDFs)
 
-**What:** Run with full v1 corpus.
+**What:** Run with the full P&C corpus.
 
 **How:**
 1. Upload full corpus

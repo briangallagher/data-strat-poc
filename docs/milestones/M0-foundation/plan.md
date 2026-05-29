@@ -29,7 +29,7 @@ Establish the project structure, documentation standards, key architectural deci
 - Initial personas and use case drafts (UC-001 document ingest — enough to frame M1)
 - Prior-art synthesis (`docs/working/prior-art-synthesis.md`)
 - Production-grade definition for this project
-- `production-gaps.md` seeded with known gaps from v1 and DataStrategy feasibility
+- `production-gaps.md` seeded with known gaps from prior work and DataStrategy feasibility
 - M1 milestone plan (`docs/milestones/M1-ingest-pipeline/plan.md`)
 - Project README with status table, doc index, and quick start links
 
@@ -75,7 +75,7 @@ Establish the project structure, documentation standards, key architectural deci
 | 13 | Write ADR-003 (OGX role) | 1 hr | Done | Decided: direct Milvus writes for ingest, OGX for query (M4) |
 | 14 | Write ADR-007 (multi-repo strategy) | 1 hr | Done | Start in hub, extract when boundaries prove stable |
 | 15 | Draft UC-001 (document ingest) + UC-002/UC-003 stubs | 30 min | Done | Cockburn format; UC-002/UC-003 as lightweight stubs |
-| 16 | Seed production-gaps.md with known gaps | 30 min | Done | PG-001 through PG-013 from v1 + DataStrategy |
+| 16 | Seed production-gaps.md with known gaps | 30 min | Done | PG-001 through PG-013 from prior work + DataStrategy |
 | 17 | Write M1 plan.md | 1.5 hr | Done | 26 tasks, two-phase verification, resource requirements |
 | 18 | Review and sign off M0 | 30 min | Done | All acceptance criteria verified |
 
@@ -85,7 +85,7 @@ Establish the project structure, documentation standards, key architectural deci
 |------------|-------|--------|
 | Access to all 5 context source repos | Brian | Available |
 | Cluster access for prerequisites verification | Brian | Available |
-| DataStrategy repo for Scenario B spec | Ana (author) | Available (read-only) |
+| DataStrategy repo for Scenario B spec | Data Strategy team | Available (read-only) |
 
 ## Risks
 

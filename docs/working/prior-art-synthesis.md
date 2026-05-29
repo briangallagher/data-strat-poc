@@ -1,13 +1,13 @@
 # Prior Art Synthesis
 
-Actionable patterns from all 5 context sources, distilled for v2 decision-making.
+Actionable patterns from all 5 context sources, distilled for decision-making.
 
 **Date:** 2026-05-23
 **Purpose:** Inform ADR-003 (OGX role), ADR-007 (multi-repo), M1 planning, and component design.
 
 ---
 
-## 1. data-strategy-poc v1
+## 1. data-strategy-poc (Prior POC)
 
 ### What Worked
 
@@ -18,15 +18,15 @@ Actionable patterns from all 5 context sources, distilled for v2 decision-making
 | Marquez for pipeline lineage | `lineage_emitter.py` (400 lines) emits OpenLineage events; 29-node graph in Marquez covering acquire → parse → embed → insert → collections | **Adapt** — extract into `rhoai-lineage` library; reduce per-pipeline boilerplate |
 | Two-layer lineage architecture | Marquez for pipeline-time (batch), MLflow for query-time (interactive). Bridge via `pipeline_run_id`. DEC-022 | **Yes** — validated design. Query-time tracing not yet implemented (JSONL audit log is the gap) |
 | Serial ingest path (`ingest-corpus.py`) | ~600 lines. Docling + OGX. Works but slow (~9 min for 15 docs). Good for validation. | **Adapt** — useful as a non-KFP fallback for debugging; not the primary path |
-| RayData ingest (`ray-ingest.py`) | Distributed parsing via RayJob. ~6.4 min for same corpus. Uses same OGX Vector I/O pattern. | **Adapt** — align with Saad's `parse_and_chunk` RayJob pattern |
+| RayData ingest (`ray-ingest.py`) | Distributed parsing via RayJob. ~6.4 min for same corpus. Uses same OGX Vector I/O pattern. | **Adapt** — align with the Ray team's `parse_and_chunk` RayJob pattern |
 | Connector package (`dsp-connectors`) | Base class + S3/Confluence/SharePoint connectors. Acquisition lineage emission. pip-installable. | **Adapt** — good interface design. Needs real OAuth, pagination, error handling (PG-010) |
-| KFP pipeline components | 6 components (acquire, parse, embed, insert, lineage, rayjob). Each ~30-100 lines. | **Adapt** — compare with Saad's 5-component structure; Saad's is more mature |
+| KFP pipeline components | 6 components (acquire, parse, embed, insert, lineage, rayjob). Each ~30-100 lines. | **Adapt** — compare with the Ray team's 5-component structure; the Ray team's is more mature |
 | Registry API + Data Hub UI | FastAPI registry for datasets/collections/sources + React/PatternFly SPA | **Defer** — not needed for M1-M4. Evaluate at M5 alongside catalog discussion |
 | Gradio demo app | RAG query UI with citations, audit tab, compliance report | **Adapt** — reuse at M4 for query path verification |
 
 ### What Didn't Work
 
-| Issue | Detail | v2 Approach |
+| Issue | Detail | Approach |
 |-------|--------|-------------|
 | Monolithic scripts | `ingest-corpus.py` (600 lines) mixes parsing, embedding, lineage, error handling | Component-per-concern in KFP pipeline |
 | Manual OpenLineage emission in every script | Each script hardcodes Marquez URL, namespace, naming conventions | `rhoai-lineage` library encodes conventions |
@@ -36,9 +36,9 @@ Actionable patterns from all 5 context sources, distilled for v2 decision-making
 
 ### Key Decisions to Carry Forward
 
-| v1 Decision | Carry Forward | Notes |
+| Prior Decision | Carry Forward | Notes |
 |-------------|---------------|-------|
-| DEC-002: OGX in MVP | **Re-evaluate** | ADR-003 — Saad's approach bypasses OGX for ingest |
+| DEC-002: OGX in MVP | **Re-evaluate** | ADR-003 — the Ray team's approach bypasses OGX for ingest |
 | DEC-004: Granite 8B initially, 70B later | **Yes** | 8B sufficient for deterministic RAG; 70B needed for agentic (M5) |
 | DEC-005: Self-serve document corpus | **Yes** | Public-domain P&C docs; no dependency on real customer data |
 | DEC-014: OpenLineage naming conventions | **Yes** | `s3://`, `milvus://`, `feast://` namespace patterns. Encode in library. |
@@ -46,7 +46,7 @@ Actionable patterns from all 5 context sources, distilled for v2 decision-making
 
 ---
 
-## 2. Saad's PRs (pipelines-components #53 + red-hat-ai-examples #78)
+## 2. the Ray team's PRs (pipelines-components #53 + red-hat-ai-examples #78)
 
 ### Patterns to Adopt
 
@@ -62,14 +62,14 @@ Actionable patterns from all 5 context sources, distilled for v2 decision-making
 | Cache-skip with sentinel file | `download_model` uses `.download_complete` to avoid re-downloading weights | **Adopt** — simple and effective |
 | `RAGSetup` K8s provisioning library | ~815 lines. Idempotent Secret/PVC/RBAC/KServe creation. `oc whoami -t` auth. | **Reference** — useful patterns for getting-started automation |
 
-### Key Differences from v1
+### Key Differences from the Prior POC
 
-| Aspect | v1 | Saad | v2 Decision |
+| Aspect | Prior POC | Ray Team | Decision |
 |--------|-----|------|-------------|
 | OGX for ingest | Yes (Vector I/O) | No (direct Milvus writes) | **ADR-003** |
 | Embedding | OGX handles it | Local sentence-transformers or vLLM endpoint | Prefer vLLM endpoint (production-grade, consistent) |
-| Intermediate storage | In-memory | S3 JSONL | S3 JSONL (Saad's pattern) |
-| Pipeline orchestration | Custom KFP components | Reusable KFP components in shared repo | Reusable components (Saad's pattern) |
+| Intermediate storage | In-memory | S3 JSONL | S3 JSONL (the Ray team's pattern) |
+| Pipeline orchestration | Custom KFP components | Reusable KFP components in shared repo | Reusable components (the Ray team's pattern) |
 | Model deployment | Separate from ingest | Part of pipeline (parallel chain) | Part of pipeline |
 
 ---
@@ -81,16 +81,16 @@ Actionable patterns from all 5 context sources, distilled for v2 decision-making
 | Pattern | Detail | Adoption |
 |---------|--------|----------|
 | Namespace injection for OpenLineage | Patches Argo workflow controller ConfigMap to inject `OPENLINEAGE_NAMESPACE` from pod `metadata.namespace` | **Adopt** — elegant solution for KFP/DSP environments |
-| `openlineage-oai` KFP adapter | Context manager wrapping KFP steps with automatic OL event emission. Handles START/COMPLETE/FAIL lifecycle. | **Evaluate** — may be simpler than v1's per-component emission |
+| `openlineage-oai` KFP adapter | Context manager wrapping KFP steps with automatic OL event emission. Handles START/COMPLETE/FAIL lifecycle. | **Evaluate** — may be simpler than per-component emission |
 | `openlineage-oai` MLflow tracking store | Custom MLflow tracking URI (`openlineage+http://...`) emits OL events alongside MLflow logging | **Evaluate** — interesting pattern for MLflow ↔ lineage bridge |
 | Dataset naming normalisation | PostgreSQL `postgresql://` → `postgres://`, Spark `s3a://` → `s3://`. Without this, lineage graphs break. | **Adopt** — encode in rhoai-lineage library's naming.py |
 | Single-manifest deploy with staged bootstrap | One YAML, rendered per-namespace, with ordered Jobs | **Reference** — we prefer manifest-per-component but the namespace rendering is useful |
 | `AgentCard` CRD | Go operator watches annotated pods, queries Marquez, builds K8s CRs for lineage cards | **Defer** — stretch goal for M5+. Interesting for agent lineage but heavy lift (Go operator). |
-| `dataset-registry` | FastAPI + PatternFly UI for canonical dataset identity, correlates with Marquez | **Reference** — similar to v1's registry-api. Evaluate at M5 alongside catalog. |
+| `dataset-registry` | FastAPI + PatternFly UI for canonical dataset identity, correlates with Marquez | **Reference** — similar concept to prior registry-api. Evaluate at M5 alongside catalog. |
 
 ### Lessons Learned (from their docs)
 
-| Lesson | Detail | Impact on v2 |
+| Lesson | Detail | Impact |
 |--------|--------|-------------|
 | Dataset naming is the #1 lineage pitfall | Inconsistent `namespace:name` strings break the graph silently. No error — just disconnected nodes. | Encode all naming conventions in `rhoai-lineage` library. Never construct dataset strings by hand. |
 | Feast project-scoped namespaces are intentional | Feast appends project name to OL namespace. Not a bug — design for multi-project isolation. | Understand before integrating; don't try to "fix" it. |
@@ -103,16 +103,16 @@ Actionable patterns from all 5 context sources, distilled for v2 decision-making
 
 ### Strategic Framing
 
-| Item | Key Takeaway | Impact on v2 |
+| Item | Key Takeaway | Impact |
 |------|-------------|-------------|
 | Scenario B is the non-Feast path | No ML models, no feature engineering. Stack: KFP → RayData+Docling → Milvus → OGX. | Confirms our component choices |
 | 13 platform-integration gaps | Mostly at integration layer, not individual components | Our gap register (PG-001 through PG-013) tracks these |
 | Pillar 4 feasibility = indeterminate | Conflates collection, aggregation, governance. Marquez productisation is multi-quarter. | Don't over-invest in Marquez infra; focus on emission patterns that work with any backend |
 | Lineage for RAG is harder than for feature stores | Manual instrumentation at 3 levels (pipeline, query, agent) vs. Feast's native emission | Lineage library is essential — can't rely on native integration |
-| Complementary architecture (Feast+MLflow → Marquez) | Not competitive tools; each has a role | Two-layer model (v1 DEC-022) is correct |
-| No lakehouse/Iceberg strategy | RHOAI has no position on open table formats | Out of scope for v2 but worth noting as a strategic gap |
+| Complementary architecture (Feast+MLflow → Marquez) | Not competitive tools; each has a role | Two-layer model (DEC-009) is correct |
+| No lakehouse/Iceberg strategy | RHOAI has no position on open table formats | Out of scope but worth noting as a strategic gap |
 
-### Research Findings That Inform v2
+### Research Findings That Inform This Project
 
 | Finding | Source | Impact |
 |---------|--------|--------|
@@ -139,15 +139,15 @@ Actionable patterns from all 5 context sources, distilled for v2 decision-making
 
 ---
 
-## Synthesis: Key Decisions for v2
+## Synthesis: Key Decisions
 
 ### Resolved
 
 | Decision | Resolution | Basis |
 |----------|-----------|-------|
-| Pipeline component structure | Adopt Saad's 5-component pattern, adapted | PR #53 is more mature than v1's components |
-| Intermediate storage | S3 JSONL between parse and ingest | Saad's pattern; decouples parsing from embedding |
-| Embedding approach | vLLM endpoint via KServe (primary), local sentence-transformers (fallback) | Saad's dual-mode pattern; production-grade |
+| Pipeline component structure | Adopt the Ray team's 5-component pattern, adapted | PR #53 is more mature than the prior POC's components |
+| Intermediate storage | S3 JSONL between parse and ingest | the Ray team's pattern; decouples parsing from embedding |
+| Embedding approach | vLLM endpoint via KServe (primary), local sentence-transformers (fallback) | the Ray team's dual-mode pattern; production-grade |
 | OpenLineage emission pattern | Per-KFP-component emission (Pattern 2) + namespace injection | ET team + integration-patterns.md assessment |
 | Dataset naming | Convention-based identity (Option 1), encoded in library | identity-correlation.md recommendation |
 | Multi-repo | Start in integration hub, extract when boundaries prove stable | ADR-007 |
@@ -156,7 +156,7 @@ Actionable patterns from all 5 context sources, distilled for v2 decision-making
 
 | Decision | ADR | Key Question | Options |
 |----------|-----|-------------|---------|
-| OGX role in ingest | ADR-003 | Use OGX Vector I/O for embedding+insert, or direct Milvus writes? | A: OGX (v1 pattern), B: Direct (Saad's pattern), C: OGX for embed only |
+| OGX role in ingest | ADR-003 | Use OGX Vector I/O for embedding+insert, or direct Milvus writes? | A: OGX (prior pattern), B: Direct (the Ray team's pattern), C: OGX for embed only |
 | Lineage backend | Future ADR | Marquez standalone, or evaluate OpenMetadata as combined catalog+lineage? | Defer to M2; start with Marquez, evaluate alternatives later |
 
 ---
@@ -165,11 +165,11 @@ Actionable patterns from all 5 context sources, distilled for v2 decision-making
 
 | Source | Location |
 |--------|----------|
-| v1 POC | `~/dev/git-repos/data-strategy-poc/` |
-| v1 decisions | `~/dev/git-repos/data-strategy-poc/docs/decisions.md` |
-| v1 learnings | `~/dev/git-repos/data-strategy-poc/docs/learnings.md` |
-| Saad's PR #53 | [pipelines-components #53](https://github.com/opendatahub-io/pipelines-components/pull/53) |
-| Saad's PR #78 | [red-hat-ai-examples #78](https://github.com/red-hat-data-services/red-hat-ai-examples/pull/78) |
+| Prior POC | `~/dev/git-repos/data-strategy-poc/` |
+| Prior POC decisions | `~/dev/git-repos/data-strategy-poc/docs/decisions.md` |
+| Prior POC learnings | `~/dev/git-repos/data-strategy-poc/docs/learnings.md` |
+| the Ray team's PR #53 | [pipelines-components #53](https://github.com/opendatahub-io/pipelines-components/pull/53) |
+| the Ray team's PR #78 | [red-hat-ai-examples #78](https://github.com/red-hat-data-services/red-hat-ai-examples/pull/78) |
 | ET lineage demo | [lineage-demo-pipeline](https://github.com/rh-waterford-et/lineage-demo-pipeline) |
 | DataStrategy | `~/dev/git-repos/DataStrategy/` |
 | Lineage library design | work-knowledge `projects/data-strategy/docs/poc/lineage/lineage-library-design.md` |

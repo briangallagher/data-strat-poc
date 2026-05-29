@@ -1,6 +1,6 @@
 # Milestones
 
-Execution plan for the Data Strategy POC v2. Each milestone builds incrementally, with E2E verification before advancing. Drill into each folder for the full plan and checkpoint.
+Execution plan for the Data Strategy POC. Each milestone builds incrementally, with E2E verification before advancing. Drill into each folder for the full plan and checkpoint.
 
 ## Status
 
@@ -15,11 +15,11 @@ Execution plan for the Data Strategy POC v2. Each milestone builds incrementally
 
 ## M1 Progress Detail
 
-M1 follows a three-phase approach: validate Saad's baseline first, then adapt for Scenario B, then scale up.
+M1 follows a three-phase approach: validate the Ray team's baseline first, then adapt for Scenario B, then scale up.
 
 | Phase | Status | What Was Done | Key Findings |
 |-------|--------|---------------|--------------|
-| Phase 0: Baseline | **Complete** | Ran Saad's pipeline as-is on our cluster | K8s auth broken in KFP pods (7 iterations to fix); codeflare SDK bypassed; `_VLLM_IMAGE` constant outside KFP scope; Milvus service name mismatch. See [lessons learned](../working/m1-phase0-lessons-learned.md). |
+| Phase 0: Baseline | **Complete** | Ran the Ray team's pipeline as-is on our cluster | K8s auth broken in KFP pods (7 iterations to fix); codeflare SDK bypassed; `_VLLM_IMAGE` constant outside KFP scope; Milvus service name mismatch. See [lessons learned](../working/m1-phase0-lessons-learned.md). |
 | Phase 1: Scenario B | **Complete** | Added `pipeline_run_id`, `source_document_id`, LOB, doc_type, effective_date to Milvus schema. HNSW index. Metadata flows through RayJob env vars → JSONL → Milvus. | All metadata verified on vectors. Per-document metadata is pipeline-level only (PG-020). See [ADR-002](../architecture/adrs/ADR-002-chunking-milvus-schema.md). |
 | Phase 2: Scale Up | **Complete** | 11 PDFs (12MB corpus including 6.9MB FEMA manual), 312 vectors, ~7 min e2e. Idempotency verified. | All documents processed without failure. Deterministic chunking confirmed (same counts on re-run). |
 | Phase 3: Pipeline Split | **Complete** | Data-chain-only `rag_ingest_pipeline` created and verified. Removes model deployment steps ([DEC-007](../decisions.md)). | Cleaner pipeline for M1–M3 — fewer params, no GPU needs, faster runs. Full pipeline retained for M4+. |

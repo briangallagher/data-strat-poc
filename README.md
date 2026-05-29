@@ -1,6 +1,6 @@
-# Data Strategy POC v2
+# Data Strategy POC
 
-Production-shaped implementation of **Scenario B** (P&C Underwriting Knowledge Assistant) from the [RHOAI Data Strategy](https://github.com/abiazett/DataStrategy). Iteration 2 — synthesising learnings from the [v1 POC](https://github.com/briangallagher/data-strategy-poc), [Saad's pipeline components](https://github.com/opendatahub-io/pipelines-components/pull/53), and the [ET lineage demo](https://github.com/rh-waterford-et/lineage-demo-pipeline).
+Production-shaped implementation of **Scenario B** (P&C Underwriting Knowledge Assistant) from the [RHOAI Data Strategy](https://github.com/abiazett/DataStrategy). Synthesises learnings from [the Ray team's pipeline components](https://github.com/opendatahub-io/pipelines-components/pull/53) and the [ET lineage demo](https://github.com/rh-waterford-et/lineage-demo-pipeline).
 
 ## What This Is
 
@@ -61,7 +61,6 @@ This project implements [Scenario B](https://github.com/abiazett/DataStrategy/bl
 | Source | What It Provides |
 |--------|------------------|
 | [DataStrategy repo](https://github.com/abiazett/DataStrategy) | Five-pillar strategy, Scenario B spec, lineage/catalog research |
-| [data-strategy-poc v1](https://github.com/briangallagher/data-strategy-poc) | Phases 0-6, 30 decisions, proven patterns |
 | [pipelines-components #53](https://github.com/opendatahub-io/pipelines-components/pull/53) | 5 reusable KFP components (Ray+Docling+Milvus+vLLM) |
 | [red-hat-ai-examples #78](https://github.com/red-hat-data-services/red-hat-ai-examples/pull/78) | RAGSetup library + 3 notebooks |
 | [lineage-demo-pipeline](https://github.com/rh-waterford-et/lineage-demo-pipeline) | Lineage operator, OpenLineage adapters, dataset registry |

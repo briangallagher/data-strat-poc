@@ -1,4 +1,4 @@
-# Data Strategy POC v2
+# Data Strategy POC
 
 The data platform proving enterprise RAG patterns on RHOAI: document ingestion, vector storage, lineage, and governance for a P&C underwriting knowledge assistant.
 
@@ -12,7 +12,7 @@ _Avoid_: Dataset (too broad — used in OpenLineage for any data artifact), Asse
 
 **Collection**:
 A logical grouping of **Documents** that will be ingested into a single Milvus vector collection. A Document can belong to multiple Collections. A Collection is the unit of pipeline execution — one pipeline run per Collection.
-_Avoid_: Corpus (historical term from v1 — replaced by Collection), Index, Bucket
+_Avoid_: Corpus (historical term — replaced by Collection), Index, Bucket
 
 **Document Registry**:
 The FastAPI + PostgreSQL service that owns canonical **Document** identity, stores metadata, and tracks **Collection** membership. The registry is a claim about what exists — not a guarantee. It is the authority the ingest pipeline trusts.
@@ -22,7 +22,7 @@ _Avoid_: Catalog (implies browsing/discovery — that's a future concern), Index
 
 **doc_id**:
 A stable, human-friendly identifier for a **Document** (e.g., `ug-005`). Persists across pipeline runs, file moves, and source system changes. Auto-generated from the Collection's `doc_id_prefix` + sequential number. The OpenLineage dataset name is derived from `doc_id`.
-_Avoid_: source_document_id (v1/v2 legacy — filename-derived, fragile), file_id, asset_id
+_Avoid_: source_document_id (legacy — filename-derived, fragile), file_id, asset_id
 
 **source_url**:
 The canonical external URL where a **Document** physically lives (S3 key, SharePoint URL, Confluence page URL). Can change when documents move — the `doc_id` remains stable.
@@ -36,7 +36,7 @@ _Avoid_: run_id (ambiguous — KFP has its own run_id), execution_id, trace_id
 
 **Connecting**:
 The capability of accessing remote source systems — authenticate, fetch files to staging. Implemented by the Connector ABC. Connectors have no knowledge of Collections, Milvus, or routing.
-_Avoid_: Ingestion (too broad — includes parsing and embedding), Acquisition (legacy v1 term that implied routing)
+_Avoid_: Ingestion (too broad — includes parsing and embedding), Acquisition (legacy term that implied routing)
 
 **Registering**:
 The capability of assigning stable identity, storing metadata, and tracking Collection membership. Implemented by the Document Registry service.
@@ -64,7 +64,7 @@ _Avoid_: Config, Metadata file
 
 **acquire_documents**:
 The first KFP component in the ingest pipeline. Queries the registry for collection members, fetches files from source systems, writes the manifest. Does NOT discover new documents — only fetches what the registry explicitly lists (ADR-010). Sole emitter of OpenLineage events to Marquez (ADR-011).
-_Avoid_: fetch_documents (acceptable but "acquire" is our canonical term from v1)
+_Avoid_: fetch_documents (acceptable but "acquire" is our canonical term)
 
 **parse_and_chunk**:
 The second KFP component. Uses RayData + Docling to parse documents and create chunks. Reads per-document metadata from the manifest.

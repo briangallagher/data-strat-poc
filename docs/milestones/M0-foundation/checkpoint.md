@@ -16,8 +16,8 @@ All 18 M0 tasks completed. The project has a full documentation structure, tooli
 | Technical writer skill | `.cursor/skills/technical-writer/SKILL.md` | Creates and verifies docs against standards; uses mermaid-technical-diagrams |
 | Architecture overview | `docs/architecture/overview.md` | C4 Context + Container diagrams, component inventory, data flows |
 | Decision log | `docs/decisions.md` | DEC-001 through DEC-005 (foundation + namespace convention) |
-| Production gap register | `docs/production-gaps.md` | PG-001 through PG-013 seeded from v1 and DataStrategy |
-| ADR-003: OGX role | `docs/architecture/adrs/ADR-003-ogx-role.md` | Direct Milvus writes for ingest (Saad's pattern); OGX reserved for query (M4) |
+| Production gap register | `docs/production-gaps.md` | PG-001 through PG-013 seeded from prior work and DataStrategy |
+| ADR-003: OGX role | `docs/architecture/adrs/ADR-003-ogx-role.md` | Direct Milvus writes for ingest (the Ray team's pattern); OGX reserved for query (M4) |
 | ADR-007: Multi-repo strategy | `docs/architecture/adrs/ADR-007-multi-repo-strategy.md` | Start in integration hub; extract when interfaces stabilise |
 | Prior-art synthesis | `docs/working/prior-art-synthesis.md` | Actionable patterns from all 5 context sources |
 | Use cases | UC-001 (full), UC-002 + UC-003 (stubs) | Cockburn format; UC-001 frames M1 scope |
@@ -41,7 +41,7 @@ All 18 M0 tasks completed. The project has a full documentation structure, tooli
 | ADR-003 decided with options analysis | Read ADR-003 | Pass | 4 options evaluated; Option D chosen (direct writes for ingest, OGX for query) |
 | personas.md defines 4 personas | Read personas.md | Pass | Underwriter, compliance officer, data engineer, platform admin |
 | UC-001 drafted in Cockburn format | Read UC-001 | Pass | Actor, goal, preconditions, main flow, extensions, postconditions |
-| Prior-art synthesis covers 5 sources | Read prior-art-synthesis.md | Pass | v1 POC, Saad's PRs, ET lineage demo, DataStrategy, work-knowledge lineage docs |
+| Prior-art synthesis covers 5 sources | Read prior-art-synthesis.md | Pass | Prior POC, the Ray team's PRs, ET lineage demo, DataStrategy, work-knowledge lineage docs |
 | production-gaps.md seeded | Read production-gaps.md | Pass | PG-001 through PG-013 with all columns filled |
 | M1 plan.md is actionable | Read M1 plan | Pass | 26 tasks, acceptance criteria, two-phase verification, dependencies, risks, resource requirements |
 | README serves as entry point | Read README.md | Pass | Status table, doc index, prior art, quick start links |
@@ -56,16 +56,16 @@ No new production gaps discovered during M0 (documentation-only milestone). The 
 
 | Gap ID | Description | Source |
 |--------|-------------|--------|
-| PG-001 | No auth/RBAC on Marquez | v1, DataStrategy P4 |
-| PG-002 | No auth on MLflow | v1, DataStrategy P4 |
-| PG-003 | No retry/dead-letter on Milvus writes | v1 |
+| PG-001 | No auth/RBAC on Marquez | Prior work, DataStrategy P4 |
+| PG-002 | No auth on MLflow | Prior work, DataStrategy P4 |
+| PG-003 | No retry/dead-letter on Milvus writes | Prior work |
 | PG-004 | Token auth disabled on RHOAI | DataStrategy P2 |
 | PG-005 | No document version tracking | DataStrategy Scenario B |
 | PG-006 | No incremental processing | DataStrategy Scenario B |
 | PG-007 | No hybrid search in Milvus | DataStrategy Scenario B |
 | PG-008 | No document-level RBAC | DataStrategy Scenario B |
-| PG-009 | No production query audit logging | v1 DEC-022 |
-| PG-010 | Mock connectors only | v1 Phase 6 |
+| PG-009 | No production query audit logging | Prior work |
+| PG-010 | Mock connectors only | Prior work |
 | PG-011 | No TLS between services | General |
 | PG-012 | No namespace isolation for multi-tenancy | DataStrategy P4 |
 | PG-013 | Manual OpenLineage emission (no auto-instrumentation) | DataStrategy P4, ET team |
@@ -80,12 +80,12 @@ No cluster resources deployed during M0. Cluster prerequisites documented in `do
 
 1. Read `docs/milestones/M1-ingest-pipeline/plan.md` — this is the next milestone
 2. Key context:
-   - ADR-003 decided: direct Milvus writes (Saad's pattern), no OGX for ingest
+   - ADR-003 decided: direct Milvus writes (the Ray team's pattern), no OGX for ingest
    - ADR-007 decided: everything in integration hub for now
    - UC-001 defines what the ingest pipeline must do
    - Prior-art synthesis in `docs/working/prior-art-synthesis.md` has patterns to adopt
 3. Start with M1 task #1 (Milvus manifest) and work sequentially through infrastructure before pipeline code
-4. Saad's PR #53 is the primary code reference for pipeline components
+4. the Ray team's PR #53 is the primary code reference for pipeline components
 
 **Key files to read first:**
 - `docs/milestones/M1-ingest-pipeline/plan.md`
@@ -97,5 +97,5 @@ No cluster resources deployed during M0. Cluster prerequisites documented in `do
 
 - **Parallel work pays off:** ADR-007, UC-001, and production gap seeding could run in parallel with the prior-art synthesis
 - **Context sources are extensive:** 5 repos with hundreds of files. The synthesis was essential for distilling actionable patterns without reading everything
-- **ADR-003 was clear-cut once the evidence was assembled:** Saad's merged code + v1's OGX coupling issues made the decision straightforward
+- **ADR-003 was clear-cut once the evidence was assembled:** the Ray team's merged code + OGX coupling issues from the prior POC made the decision straightforward
 - **Production gaps register is immediately useful:** having 13 known gaps before building starts sets expectations and prevents "we'll fix it later" drift

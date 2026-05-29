@@ -6,7 +6,7 @@
 
 ## Context
 
-The v1 POC had connectors with three methods: authenticate, resolve, fetch_to_staging. For M3, the ingest pipeline needs connectors but the resolve method (source discovery) is reserved for a separate discovery workflow. We needed to decide whether to split the interface or keep it unified.
+The prior POC had connectors with three methods: authenticate, resolve, fetch_to_staging. For M3, the ingest pipeline needs connectors but the resolve method (source discovery) is reserved for a separate discovery workflow. We needed to decide whether to split the interface or keep it unified.
 
 ## Decision
 

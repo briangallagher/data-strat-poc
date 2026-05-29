@@ -61,7 +61,7 @@ In the POC, source and staging are both on the same MinIO instance. In productio
 
 ## Confluence Mock
 
-**Status:** Stretch goal. Code exists from v1 POC but was not exercised in M3.
+**Status:** Stretch goal. Code exists from the prior POC but was not exercised in M3.
 
 The mock connector simulates Confluence page retrieval by reading pre-staged HTML files from a local directory. It demonstrates the connector interface without requiring a live Confluence instance. If ported, it would use the same `authenticate`/`fetch_to_staging` pattern with Confluence REST API credentials.
 

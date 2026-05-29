@@ -2,15 +2,15 @@
 
 **Date:** 2026-05-28
 **Author:** Brian Gallagher, AIP Kubeflow-DevX
-**POC:** Data Strategy POC v2 — P&C Underwriting Knowledge Assistant (Scenario B)
+**POC:** Data Strategy POC — P&C Underwriting Knowledge Assistant (Scenario B)
 **POC Status:** M4 Complete (Deterministic RAG operational), M5 Planned (Agentic RAG)
-**Audience:** Data Strategy team (Jonathan Zarecki, Ana Biazetti, Francisco Arceo, Paul McCarthy)
+**Audience:** Data Strategy team (Jonathan Zarecki, Francisco Arceo, Paul McCarthy)
 
 ---
 
 ## Purpose
 
-This document presents seven findings from the Data Strategy POC v2 that have implications for the Data Strategy proposal. Each finding identifies a gap or correction in the current proposal, provides evidence from the POC (referencing specific decisions, ADRs, and production gaps), and offers a concrete recommendation for updating the proposal.
+This document presents seven findings from the Data Strategy POC that have implications for the Data Strategy proposal. Each finding identifies a gap or correction in the current proposal, provides evidence from the POC (referencing specific decisions, ADRs, and production gaps), and offers a concrete recommendation for updating the proposal.
 
 The POC validates the five-pillar architecture overall — it works for enterprise RAG without a feature store and without Feast. These findings are refinements, not objections. They represent places where building a working system revealed requirements the proposal's top-down framing missed.
 
@@ -89,7 +89,7 @@ Position it between P1 (connectors) and P2 (compute) in the architecture diagram
 
 **What the POC found:** OGX's value is real but narrower than the proposal implies. Three specific issues emerged:
 
-1. **Ingest path — OGX Vector I/O is a lineage blind spot.** OGX emits no OpenLineage events. Embedding and Milvus insertion happen in a single opaque API call with no observability into which model was used, batch sizes, retries, or transformations. Direct Milvus writes (Saad's upstream pattern) make every step observable and lineage-emittable. (ADR-003, Lineage Implications section)
+1. **Ingest path — OGX Vector I/O is a lineage blind spot.** OGX emits no OpenLineage events. Embedding and Milvus insertion happen in a single opaque API call with no observability into which model was used, batch sizes, retries, or transformations. Direct Milvus writes (the Ray team's upstream pattern) make every step observable and lineage-emittable. (ADR-003, Lineage Implications section)
 
 2. **Deterministic RAG — LangGraph + MLflow provides superior observability.** For single-collection, deterministic retrieval (Workflow A), LangGraph with `mlflow.langchain.autolog()` captures the full trace tree automatically — every tool call, every retrieved chunk with doc_id and score, every LLM generation. OGX Responses API provides no native tracing; achieving equivalent observability requires wrapping OGX calls in custom MLflow spans. (DEC-010, options analysis)
 

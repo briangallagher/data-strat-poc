@@ -2,7 +2,7 @@
 
 ## What This Is
 
-The `parse_and_chunk` component is a KFP pipeline step that parses PDF documents into structured, semantically chunked text using RayData for distributed compute and IBM Docling for document understanding. It is the first step in the ingest pipeline — converting raw PDFs into JSONL chunks stored in S3, ready for embedding and Milvus insertion. This component originated from Saad Zaher's merged PR #53 to `opendatahub-io/pipelines-components` and was adapted for Scenario B metadata requirements.
+The `parse_and_chunk` component is a KFP pipeline step that parses PDF documents into structured, semantically chunked text using RayData for distributed compute and IBM Docling for document understanding. It is the first step in the ingest pipeline — converting raw PDFs into JSONL chunks stored in S3, ready for embedding and Milvus insertion. This component originated from the Ray team's merged PR #53 to `opendatahub-io/pipelines-components` and was adapted for Scenario B metadata requirements.
 
 ## Architecture Context
 
@@ -164,7 +164,7 @@ Metadata fields (`lob`, `doc_type`, `effective_date`) come from pipeline paramet
 
 | Source | Link |
 |--------|------|
-| Saad's original PR | [pipelines-components #53](https://github.com/opendatahub-io/pipelines-components/pull/53) |
+| the Ray team's original PR | [pipelines-components #53](https://github.com/opendatahub-io/pipelines-components/pull/53) |
 | Fork branch (with fixes) | [briangallagher/pipelines-components:data-strat-poc](https://github.com/briangallagher/pipelines-components/tree/data-strat-poc) |
 | ADR-002 (chunking + Milvus schema) | [ADR-002-chunking-milvus-schema.md](../architecture/adrs/ADR-002-chunking-milvus-schema.md) |
 | ADR-003 (OGX role — why not OGX for ingest) | [ADR-003-ogx-role.md](../architecture/adrs/ADR-003-ogx-role.md) |

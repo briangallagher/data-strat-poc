@@ -30,7 +30,7 @@ Issues with distributed compute, RayJob submission, and document processing.
 | ID | Gap | Why It Exists | Production Standard | Path to Close | Status |
 |----|-----|---------------|---------------------|---------------|--------|
 | PG-004 | Token auth disabled on RHOAI (affects Ray) | Systemic RHOAI platform blocker — token auth disabled, blocking secure data access for Ray/Spark/Feast | Token auth enabled and tested for all compute engines | Platform team dependency; track status | Open — platform dep |
-| PG-006 | No incremental processing | v1 re-processed full corpus on every run | Change detection + re-process only modified documents | Document fingerprinting + delta processing | Open |
+| PG-006 | No incremental processing | Full corpus re-processed on every run | Change detection + re-process only modified documents | Document fingerprinting + delta processing | Open |
 
 ## Milvus / Vector Storage
 
@@ -38,9 +38,9 @@ Issues with vector database deployment, schema, and query capabilities.
 
 | ID | Gap | Why It Exists | Production Standard | Path to Close | Status |
 |----|-----|---------------|---------------------|---------------|--------|
-| PG-003 | No retry/dead-letter on Milvus writes | v1 used basic try/except; no retry logic | Configurable retry with exponential backoff + dead-letter collection | Implement in pipeline component or rhoai-lineage library | Open |
-| PG-007 | No hybrid search in Milvus | v1 used dense-only similarity search | Hybrid search (BM25 sparse + dense) for better keyword recall | Milvus 2.4+ supports hybrid; implement dual-vector schema | Open |
-| PG-008 | No document-level RBAC | v1 had no access control on which documents a user can query | Partition-level or metadata-filter RBAC per user role | Evaluate Milvus partition-key isolation + query-time filtering | Open |
+| PG-003 | No retry/dead-letter on Milvus writes | Basic try/except with no retry logic | Configurable retry with exponential backoff + dead-letter collection | Implement in pipeline component or rhoai-lineage library | Open |
+| PG-007 | No hybrid search in Milvus | Dense-only similarity search | Hybrid search (BM25 sparse + dense) for better keyword recall | Milvus 2.4+ supports hybrid; implement dual-vector schema | Open |
+| PG-008 | No document-level RBAC | No access control on which documents a user can query | Partition-level or metadata-filter RBAC per user role | Evaluate Milvus partition-key isolation + query-time filtering | Open |
 | PG-016 | Milvus deployed with anyuid SCC | Helm chart requires anyuid for Milvus pods | Restricted SCC or operator-managed deployment | Evaluate Milvus Operator or restricted-SCC Helm values | Open |
 | PG-017 | 500Gi MinIO PVC from Milvus Helm defaults | Helm default for Milvus internal MinIO — way oversized | Right-sized storage (10-50Gi for POC) | Redeploy with `minio.persistence.size=10Gi` | Open |
 
@@ -61,7 +61,7 @@ Issues with OpenLineage, Marquez, MLflow, and audit logging.
 |----|-----|---------------|---------------------|---------------|--------|
 | PG-001 | No auth/RBAC on Marquez | Marquez has no built-in auth; upstream Shiro never shipped | mTLS + K8s RBAC proxy (MLflow operator pattern) | Sidecar OAuth proxy or in-process plugin | Open |
 | PG-002 | No auth on MLflow | MLflow upstream has no real auth system | RHOAI MLflow operator with K8s auth plugin | Adopt `opendatahub-io/mlflow-kubernetes-plugins` | Open |
-| PG-009 | No query/response audit logging (production) | v1 used JSONL file on PVC; `pipeline_run_id` always null | MLflow GenAI traces with structured spans and bridge | **Fixed:** M4 — `mlflow.langchain.autolog()` captures full query traces with doc_ids, pipeline_run_ids, chunks, and scores. Trace tags enable search/filter. | **Closed** (M4) |
+| PG-009 | No query/response audit logging (production) | JSONL file on PVC; `pipeline_run_id` always null | MLflow GenAI traces with structured spans and bridge | **Fixed:** M4 — `mlflow.langchain.autolog()` captures full query traces with doc_ids, pipeline_run_ids, chunks, and scores. Trace tags enable search/filter. | **Closed** (M4) |
 | PG-013 | OpenLineage emission is manual | No RHOAI component emits OL natively; all explicit in code | Auto-instrumentation or SDK-level emission | rhoai-lineage library abstracts this | Open |
 | PG-021 | rhoai-lineage installed via git URL | No PyPI package; `pip install git+https://...` is slow (~30s) in KFP pods | Published wheel on PyPI or internal registry | Build and publish wheel once API stabilises | Open |
 | PG-022 | Marquez deployed in same namespace | No network isolation between lineage backend and pipeline workloads | Separate namespace (`data-strat-lineage`) with NetworkPolicy | Redeploy Marquez to isolated namespace | Open |
@@ -75,8 +75,8 @@ Issues with document source acquisition and connectivity.
 
 | ID | Gap | Why It Exists | Production Standard | Path to Close | Status |
 |----|-----|---------------|---------------------|---------------|--------|
-| PG-005 | No document version tracking | v1 tracked dates in schema but never exercised | Automated staleness detection when docs are superseded | Version tracking in connector + Milvus metadata | Open |
-| PG-010 | Mock connectors only | v1 built mock Confluence/SharePoint; real connectors need OAuth, pagination | Production connectors with OAuth2, incremental sync | Build real connectors or adopt dlt | Open |
+| PG-005 | No document version tracking | Dates tracked in schema but never exercised | Automated staleness detection when docs are superseded | Version tracking in connector + Milvus metadata | Open |
+| PG-010 | Mock connectors only | Mock Confluence/SharePoint connectors; real connectors need OAuth, pagination | Production connectors with OAuth2, incremental sync | Build real connectors or adopt dlt | Open |
 | PG-020 | Pipeline-level metadata only (no per-document) | All docs in a run get same category/subcategory/document_date from pipeline params | Per-document metadata from manifest file keyed by filename | **Fixed:** M3 Phase 2 — `parse_and_chunk` reads per-document metadata from staging `manifest.json`. Each chunk inherits parent document's `doc_id`, `line_of_business`, `jurisdiction`, `effective_date`, `document_type`. | **Closed** (M3) |
 
 ## Security / Platform

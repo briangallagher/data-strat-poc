@@ -9,7 +9,7 @@ A KFP-orchestrated document ingest pipeline that parses PDFs with RayData + Docl
 
 ### Phase 0: Baseline Validation
 
-Deployed Saad's pipeline components (PR #53) on the `data-strat-poc` cluster exactly as shipped. Validated the data chain (parse_and_chunk → ingest_to_milvus) end-to-end. Identified and fixed critical K8s auth issue (PG-014) that blocked RayJob submission from KFP pods. Model chain (download_model + deploy_embedding_model) was tested but partially blocked — LLM deployment is M4 scope, and RHOAI 3.4 vLLM lacks `--task=embedding` (PG-018).
+Deployed the Ray team's pipeline components (PR #53) on the `data-strat-poc` cluster exactly as shipped. Validated the data chain (parse_and_chunk → ingest_to_milvus) end-to-end. Identified and fixed critical K8s auth issue (PG-014) that blocked RayJob submission from KFP pods. Model chain (download_model + deploy_embedding_model) was tested but partially blocked — LLM deployment is M4 scope, and RHOAI 3.4 vLLM lacks `--task=embedding` (PG-018).
 
 **Result:** 2 PDFs processed, 5 chunks in Milvus, data chain fully green. 6 production gaps documented (PG-014 through PG-019).
 
@@ -19,13 +19,13 @@ Extended the pipeline for Scenario B requirements:
 - Milvus collection schema expanded to 10 fields (ADR-002): `pipeline_run_id`, `source_document_id`, `lob`, `doc_type`, `effective_date` added alongside baseline fields
 - HNSW index replaced IVF_FLAT (better for incremental inserts and sub-1M collections)
 - Metadata flow: pipeline params → env vars → JSONL → Milvus vectors
-- Verified with 2–3 small P&C PDFs from the v1 corpus
+- Verified with 2–3 small P&C PDFs from the P&C corpus
 
 **Result:** All metadata fields present on every vector. `pipeline_run_id` correctly links vectors to KFP runs. PG-020 identified (pipeline-level metadata only, no per-document).
 
 ### Phase 2: Full Corpus Verification
 
-Ran the adapted pipeline against the full v1 P&C corpus (11 PDFs). Verified at medium scale: performance, edge case handling, idempotency.
+Ran the adapted pipeline against the full P&C corpus (11 PDFs). Verified at medium scale: performance, edge case handling, idempotency.
 
 **Result:** 11 PDFs → 312 vectors. ~7 minutes end-to-end. Idempotent (re-run with `drop_existing=true` produces identical count). All acceptance criteria met for the data chain.
 
@@ -38,7 +38,7 @@ Ran the adapted pipeline against the full v1 P&C corpus (11 PDFs). Verified at m
 | Phase 0: model chain | Pipeline run (download_model + deploy_embedding_model) | **Partial** | download_model passes; deploy_embedding_model blocked (PG-018). Deferred to M4. |
 | Phase 1: Scenario B metadata | Query Milvus for all 10 fields | **Pass** | All vectors have source_document_id, pipeline_run_id, lob, doc_type, effective_date |
 | Phase 1: HNSW index | Collection info query | **Pass** | HNSW with M=16, efConstruction=256, COSINE metric |
-| Phase 2: full corpus (11 PDFs) | Pipeline run with v1 P&C corpus | **Pass** | 312 vectors, ~7 min e2e, no failures |
+| Phase 2: full corpus (11 PDFs) | Pipeline run with full P&C corpus | **Pass** | 312 vectors, ~7 min e2e, no failures |
 | Phase 2: idempotency | Re-run pipeline with `drop_existing=true`, compare counts | **Pass** | Same 312 vectors on second run |
 | Phase 2: similarity search | Query with "property insurance coverage" | **Pass** | Relevant results returned with cosine scores > 0.5 |
 | Runbook verified | Follow run-ingest-pipeline.md from scratch | **Pass** | All steps reproducible |
@@ -75,7 +75,7 @@ Ran the adapted pipeline against the full v1 P&C corpus (11 PDFs). Verified at m
 | MinIO (pipeline storage) | Running | Buckets: `rag-chunks` (input PDFs + JSONL output), `pipeline-artifacts` |
 | Milvus MinIO (Helm-managed) | Running | 500Gi PVC (PG-017 — oversized) |
 | DSPA (KFP v2) | Running | 6 `ds-pipeline-*` pods. 11+ pipeline runs in history. |
-| data-pvc | Bound (5Gi) | 11 PDFs from v1 P&C corpus |
+| data-pvc | Bound (5Gi) | 11 P&C PDFs |
 | model-cache-pvc | Bound (50Gi) | Mistral 7B cached (for M4) |
 | mariadb-dspa | Bound (10Gi) | KFP metadata |
 | Pipeline SA RBAC | Applied | Role + RoleBinding for RayJob, KServe, HardwareProfile CRDs |
@@ -125,7 +125,7 @@ Ran the adapted pipeline against the full v1 P&C corpus (11 PDFs). Verified at m
 
 ### What Went Well
 
-- **Validate-first approach paid off.** Phase 0 (run Saad's code unchanged) caught the K8s auth issue early, before any Scenario B customisation. All 7 iterations of the auth fix were on a known baseline.
+- **Validate-first approach paid off.** Phase 0 (run the Ray team's code unchanged) caught the K8s auth issue early, before any Scenario B customisation. All 7 iterations of the auth fix were on a known baseline.
 - **S3 intermediate storage is valuable.** JSONL between parse and ingest steps enabled debugging each step independently and retrying ingest without re-parsing.
 - **Local embedding mode is a good fallback.** When vLLM `--task=embedding` was blocked (PG-018), local sentence-transformers worked immediately. No GPU needed for the ingest pipeline.
 - **ADR-003 decision vindicated.** Direct Milvus writes gave full control over schema, metadata, and error handling — exactly what was needed for Scenario B. OGX Vector I/O would have been a black box.
@@ -152,11 +152,11 @@ Per ADR-007 criteria (stable interface, independent release cadence, different t
 |-----------|-----------|-----------|
 | `parse_and_chunk` | **Contribute upstream** | Auth fix is general-purpose. Metadata adaptations could be parameterised (manifest file approach). |
 | `ingest_to_milvus` | **Contribute upstream** | Schema is parameterised. Scenario B metadata fields are passed as pipeline params, not hardcoded. |
-| `download_model` | **Use upstream directly** | No changes needed from Saad's baseline. |
+| `download_model` | **Use upstream directly** | No changes needed from the Ray team's baseline. |
 | `deploy_embedding_model` | **Use upstream directly** | No changes needed (blocked on RHOAI version, not code). |
 | KFP pipeline definition | **Keep in this repo** | Project-specific orchestration. |
 | Milvus Helm values | **Keep in this repo** | Cluster-specific configuration. |
-| Docling Ray image | **Use Saad's image** | `quay.io/rhoai-szaher/docling-ray:latest` works as-is. Custom image not needed for M1. |
+| Docling Ray image | **Use the Ray team's image** | `quay.io/rhoai-szaher/docling-ray:latest` works as-is. Custom image not needed for M1. |
 
 **Key finding:** The SA token auth fix and Scenario B metadata adaptations both generalise. The auth fix should be reported upstream to codeflare-sdk. The metadata approach could be contributed as an enhancement to `opendatahub-io/pipelines-components` once the manifest file approach (PG-020 resolution) is implemented.
 
@@ -165,7 +165,7 @@ Per ADR-007 criteria (stable interface, independent release cadence, different t
 | Tag | Repo | Description |
 |-----|------|-------------|
 | `m0-complete` | data-strat-poc | M0 documentation and planning complete |
-| `m1-p0` | data-strat-poc, pipelines-components | Phase 0: Saad's baseline validated |
+| `m1-p0` | data-strat-poc, pipelines-components | Phase 0: the Ray team's baseline validated |
 | `m1-p1` | data-strat-poc, pipelines-components | Phase 1: Scenario B metadata adaptations |
 | `m1-p2` | data-strat-poc, pipelines-components | Phase 2: Full corpus, 312 vectors, idempotency |
 | `m1-complete` | data-strat-poc, pipelines-components | M1 milestone sign-off |
