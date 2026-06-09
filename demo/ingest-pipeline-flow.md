@@ -4,20 +4,25 @@
 
 ```mermaid
 flowchart LR
-    %% ── Source Documents ──
-    subgraph docs["Source Documents (S3/MinIO)"]
+    %% ── Source Documents (independent, ungrouped) ──
+    subgraph docs["Source Documents"]
         direction TB
-        ug_docs["📄 Underwriting Guidelines<br/><i>NY DFS circulars, rating manuals,<br/>program bulletins</i><br/><b>10 documents</b>"]
-        iso_docs["📄 ISO / ACORD Forms<br/><i>CG 00 01, CP 00 10,<br/>endorsements, applications</i><br/><b>5 documents</b>"]
-        rb_docs["📄 Regulatory Bulletins<br/><i>State DOI bulletins, NAIC<br/>model laws, filing instructions</i><br/><b>7 documents</b>"]
+        d1["📄 NY DFS Circular Letter"]
+        d2["📄 Rating Manual v2026"]
+        d3["📄 GL Program Bulletin"]
+        d4["📄 ISO CG 00 01 04/13"]
+        d5["📄 ACORD 125 Application"]
+        d6["📄 CA DOI Bulletin 2026-03"]
+        d7["📄 NAIC Model Law AI/ML"]
+        d8["📄 ...22 documents total"]
     end
 
-    %% ── Collection Grouping ──
-    subgraph groups["Logical Collections"]
+    %% ── Collection Assignment (UI / user decision) ──
+    subgraph groups["Grouped into Collections (UI)"]
         direction TB
-        ug_col["underwriting_guidelines<br/><code>prefix: ug</code>"]
-        iso_col["iso_forms<br/><code>prefix: if</code>"]
-        rb_col["regulatory_bulletins<br/><code>prefix: rb</code>"]
+        ug_col["<b>underwriting_guidelines</b><br/><code>prefix: ug</code><br/>10 documents"]
+        iso_col["<b>iso_forms</b><br/><code>prefix: if</code><br/>5 documents"]
+        rb_col["<b>regulatory_bulletins</b><br/><code>prefix: rb</code><br/>7 documents"]
     end
 
     %% ── Pipeline (one run per collection) ──
@@ -38,9 +43,13 @@ flowchart LR
     end
 
     %% ── Connections ──
-    ug_docs --> ug_col
-    iso_docs --> iso_col
-    rb_docs --> rb_col
+    d1 --> ug_col
+    d2 --> ug_col
+    d3 --> ug_col
+    d4 --> iso_col
+    d5 --> iso_col
+    d6 --> rb_col
+    d7 --> rb_col
 
     ug_col --> step1
     iso_col --> step1
@@ -56,7 +65,7 @@ flowchart LR
     classDef pipeline fill:#f0fdf4,stroke:#16a34a
     classDef vectordb fill:#fef3c7,stroke:#d97706
 
-    class ug_docs,iso_docs,rb_docs source
+    class d1,d2,d3,d4,d5,d6,d7,d8 source
     class ug_col,iso_col,rb_col collection
     class step1,step2,step3 pipeline
     class m_ug,m_iso,m_rb vectordb
