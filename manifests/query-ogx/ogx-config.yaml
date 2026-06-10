@@ -24,12 +24,12 @@ data:
       - provider_id: sentence-transformers
         provider_type: inline::sentence-transformers
         config: {}
-      - provider_id: vllm-granite
+      - provider_id: vllm-hermes
         provider_type: remote::vllm
         config:
           api_token: ${env.VLLM_API_TOKEN:=fake}
           max_tokens: ${env.VLLM_MAX_TOKENS:=4096}
-          base_url: http://granite-llm-predictor.data-strat-poc.svc.cluster.local:8080/v1
+          base_url: http://llama-70b-vllm.data-strat-poc.svc.cluster.local:8080/v1
       vector_io:
       - provider_id: milvus
         provider_type: inline::milvus
@@ -105,12 +105,12 @@ data:
         model_type: embedding
         metadata:
           embedding_dimension: 768
-      - provider_id: vllm-granite
-        model_id: granite-3.3-8b-instruct
-        provider_model_id: granite-llm
+      - provider_id: vllm-hermes
+        model_id: hermes-3-llama-3.1-70b-fp8
+        provider_model_id: NousResearch/Hermes-3-Llama-3.1-70B-FP8
         model_type: llm
         metadata:
-          description: "IBM Granite 3.3 8B Instruct via vLLM"
+          description: "Hermes 3 Llama 3.1 70B FP8 via vLLM (DEC-013)"
       shields: []
       vector_dbs: []
       datasets: []

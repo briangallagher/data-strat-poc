@@ -1,0 +1,24 @@
+# Secret: mlflow-token
+# Provides the ServiceAccount token for MLflow tracking from query apps.
+#
+# Create from the pipeline-runner SA token:
+#   oc create secret generic mlflow-token \
+#     --from-literal=token=$(oc create token pipeline-runner-dspa -n data-strat-poc --duration=8760h) \
+#     -n data-strat-poc
+#
+# Or use a short-lived token for development:
+#   oc create secret generic mlflow-token \
+#     --from-literal=token=$(oc create token default -n data-strat-poc) \
+#     -n data-strat-poc
+#
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mlflow-token
+  namespace: data-strat-poc
+  labels:
+    app: compliance-review-ui
+    milestone: m5
+type: Opaque
+stringData:
+  token: "REPLACE_WITH_SA_TOKEN"

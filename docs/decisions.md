@@ -239,6 +239,30 @@ This is analogous to how M4's `mlflow.langchain.autolog()` captures LangGraph to
 
 **Consequences:** Simpler architecture — tool service stays clean (no MLflow dependency). All tracing happens client-side. Trade-off: if OGX encounters errors during tool calls that aren't reflected in the response, the client won't see them. Acceptable for POC; revisit if tool reliability is an issue.
 
+### DEC-014: OpenLineage Naming Conventions
+**Date:** 2026-05-25
+**Milestone:** M2
+**Status:** Decided
+
+**Context:** OpenLineage requires globally-unique dataset and job identifiers. Without a convention, naming drift across pipeline steps and milestone iterations produces orphaned or mismatched nodes in Marquez. The `rhoai-lineage` library needs deterministic naming helpers.
+
+**Decision:** Enforce naming via the `rhoai-lineage` naming module:
+
+- **Job namespace:** Kubernetes namespace from downward API (`OPENLINEAGE_NAMESPACE` → `data-strat-poc`)
+- **Job name:** `<step_name>/<collection_name>` (e.g., `parse_and_chunk/underwriting_guidelines`)
+- **Dataset namespace (S3):** `s3://<host>:<port>` (e.g., `s3://minio-service:9000`)
+- **Dataset name (S3):** `/<bucket>/<path>` (e.g., `/rag-chunks/chunks-underwriting_guidelines`)
+- **Dataset namespace (Milvus):** `milvus://<host>:<port>` (e.g., `milvus://milvus.data-strat-poc.svc.cluster.local:19530`)
+- **Dataset name (Milvus):** `/<collection_name>` (e.g., `/underwriting_guidelines`)
+- **Dataset namespace (Registry):** `registry://<source_system>` (e.g., `registry://ny_dfs`)
+- **Dataset name (Registry):** `/<doc_id>` (e.g., `/ug-001`)
+
+All naming derived from environment variables and pipeline parameters — no hardcoded values.
+
+**Consequences:** Deterministic, portable identifiers. Marquez graph is stable across re-runs (same names = same nodes updated, not duplicated). The naming module is the single source of truth — pipeline components call helpers, not construct URIs manually.
+
+---
+
 ### DEC-013: Model Selection — Hermes-3-Llama-3.1-70B-FP8
 **Date:** 2026-05-28
 **Milestone:** M5

@@ -1,4 +1,4 @@
-# ADR-004: OGX for Agentic RAG
+# ADR-013: OGX for Agentic RAG
 
 **Date:** 2026-05-28
 **Status:** Decided

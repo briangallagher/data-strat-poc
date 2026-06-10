@@ -27,12 +27,12 @@ Where a component warrants its own repo, PyPI package, or container image, it is
 
 | Milestone | Status | Summary |
 |-----------|--------|---------|
-| M0: Foundation | **Active** | Documentation structure, ADRs, prerequisites, tooling |
-| M1: Ingest Pipeline | Planned | RayData + Docling + KFP + Milvus |
-| M2: MLflow | Planned | Experiment tracking + lineage instrumentation |
-| M3: Connectors | Planned | Data source acquisition layer |
-| M4: Query | Planned | OGX Responses API + deterministic RAG |
-| M5: Agentic + Hardening | Planned | Multi-hop retrieval, RBAC, production gap closure |
+| M0: Foundation | **Complete** | Documentation structure, ADRs, prerequisites, tooling |
+| M1: Ingest Pipeline | **Complete** | RayData + Docling + KFP + Milvus (single collection) |
+| M2: MLflow + Lineage | **Complete** | Experiment tracking + OpenLineage/Marquez instrumentation |
+| M3: Connectors + Multi-Collection | **Complete** | Document Registry, multi-collection ingest, source acquisition |
+| M4: Query (Deterministic) | **Complete** | LangGraph + MCP + MLflow tracing + Chainlit UI |
+| M5: Agentic + Hardening | **Complete** | OGX Responses API, multi-hop RAG, provenance portal |
 
 ## Documentation
 

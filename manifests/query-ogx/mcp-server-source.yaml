@@ -1,0 +1,18 @@
+# ConfigMap: mcp-server-source
+# Contains the Python source for the MCP knowledge-base server.
+# Create from source: oc create configmap mcp-server-source --from-file=mcp_server.py=src/query_ogx/mcp_server.py -n data-strat-poc
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-server-source
+  namespace: data-strat-poc
+  labels:
+    app: mcp-knowledge-base
+    milestone: m5
+data:
+  # Populated via `oc create configmap --from-file` from src/query_ogx/
+  # Run: oc create configmap mcp-server-source --from-file=mcp_server.py=src/query_ogx/mcp_server.py -n data-strat-poc
+  _README: |
+    This ConfigMap is created manually from source files.
+    Run: oc create configmap mcp-server-source --from-file=mcp_server.py=src/query_ogx/mcp_server.py -n data-strat-poc

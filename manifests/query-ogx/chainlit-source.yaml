@@ -1,0 +1,27 @@
+# ConfigMap: chainlit-source
+# Contains the Python source files for the compliance-review-ui Chainlit app.
+# Create from source: oc create configmap chainlit-source --from-file=app.py=src/query_ogx/app.py --from-file=lineage.py=src/query_ogx/lineage.py -n data-strat-poc
+#
+# This template documents the expected structure. In practice, create from the
+# source files directly to avoid maintaining copies:
+#
+#   oc create configmap chainlit-source \
+#     --from-file=app.py=src/query_ogx/app.py \
+#     --from-file=lineage.py=src/query_ogx/lineage.py \
+#     --from-file=.chainlit=src/query_ogx/.chainlit \
+#     -n data-strat-poc
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chainlit-source
+  namespace: data-strat-poc
+  labels:
+    app: compliance-review-ui
+    milestone: m5
+data:
+  # Populated via `oc create configmap --from-file` from src/query_ogx/
+  # See command above. This manifest serves as documentation of the expected resource.
+  _README: |
+    This ConfigMap is created manually from source files.
+    Run: oc create configmap chainlit-source --from-file=app.py=src/query_ogx/app.py --from-file=lineage.py=src/query_ogx/lineage.py -n data-strat-poc

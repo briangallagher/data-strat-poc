@@ -36,7 +36,7 @@ spec:
             - name: OGX_API_KEY
               value: "fake"
             - name: OGX_MODEL
-              value: "vllm-granite/granite-llm"
+              value: "vllm-hermes/hermes-3-llama-3.1-70b-fp8"
             - name: MCP_SERVER_URL
               value: "http://mcp-knowledge-base.data-strat-poc.svc.cluster.local:8000/sse"
             - name: MLFLOW_TRACKING_URI
